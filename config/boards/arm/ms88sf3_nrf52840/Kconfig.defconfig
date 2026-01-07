@@ -4,7 +4,7 @@ config BOARD
 	default "ms88sf3_nrf52840"
 
 config ZMK_KEYBOARD_NAME
-	default "MS88SF3 NRF52840"
+	default "MS88SF3 NRF52x"
 
 if USB_DEVICE_STACK
 
