@@ -2,124 +2,19 @@ name: Build ZMK firmware
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
-  matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: set-matrix
-        run: |
-          matrix=$(python3 -c "
-          import yaml, json
-          with open('build.yaml') as f:
-              data = yaml.safe_load(f)
-          include = data.get('include', [])
-          print(json.dumps({'include': include}))
-          ")
-          echo "matrix=$matrix" >> $GITHUB_OUTPUT
-
   build:
-    needs: matrix
-    runs-on: ubuntu-latest
-    container:
-      image: zmkfirmware/zmk-build-arm:stable
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@v0.3
 
-      - name: Cache west modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            modules/
-            tools/
-            zephyr/
-            bootloader/
-            zmk/
-          key: west-${{ hashFiles('config/west.yml') }}
-
-      - name: West init
-        run: west init -l config
-
-      - name: West update
-        run: west update
-
-      - name: West zephyr-export
-        run: west zephyr-export
-
-      - name: Build firmware
-        run: |
-          SHIELD="${{ matrix.shield }}"
-          BOARD="${{ matrix.board }}"
-          SNIPPET="${{ matrix.snippet }}"
-          CMAKE_ARGS="${{ matrix.cmake-args }}"
-
-          # West build arguments
-          WEST_ARGS="-s zmk/app -b $BOARD"
-
-          # CMake arguments (passed after --)
-          CMAKE_EXTRA=""
-
-          if [ -n "$SHIELD" ]; then
-            CMAKE_EXTRA="$CMAKE_EXTRA -DSHIELD=$SHIELD"
-          fi
-
-          if [ -n "$SNIPPET" ]; then
-            CMAKE_EXTRA="$CMAKE_EXTRA -DSNIPPET=$SNIPPET"
-          fi
-
-          if [ -n "$CMAKE_ARGS" ]; then
-            CMAKE_EXTRA="$CMAKE_EXTRA $CMAKE_ARGS"
-          fi
-
-          if [ -n "$CMAKE_EXTRA" ]; then
-            west build $WEST_ARGS -- $CMAKE_EXTRA
-          else
-            west build $WEST_ARGS
-          fi
-
-      - name: Prepare artifacts
-        run: |
-          mkdir -p artifacts
-          ARTIFACT_NAME="${{ matrix.artifact-name }}"
-          if [ -z "$ARTIFACT_NAME" ]; then
-            ARTIFACT_NAME="${{ matrix.board }}"
-            if [ -n "${{ matrix.shield }}" ]; then
-              ARTIFACT_NAME="${{ matrix.shield }}-$ARTIFACT_NAME"
-            fi
-          fi
-
-          # Copy hex file (for OpenOCD/J-Link flashing)
-          if [ -f build/zephyr/zephyr.hex ]; then
-            cp build/zephyr/zephyr.hex "artifacts/${ARTIFACT_NAME}.hex"
-          fi
-
-          # Copy uf2 file (for USB bootloader flashing)
-          if [ -f build/zephyr/zephyr.uf2 ]; then
-            cp build/zephyr/zephyr.uf2 "artifacts/${ARTIFACT_NAME}.uf2"
-          fi
-
-          # Copy bin file as fallback
-          if [ -f build/zephyr/zephyr.bin ]; then
-            cp build/zephyr/zephyr.bin "artifacts/${ARTIFACT_NAME}.bin"
-          fi
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact-name || format('{0}-{1}', matrix.shield, matrix.board) }}
-          path: artifacts/
-
-  merge:
+  upload-hex:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Merge artifacts
-        uses: actions/upload-artifact/merge@v4
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Upload HEX firmware
+        uses: actions/upload-artifact@v4
         with:
-          name: firmware
-          delete-merged: true
+          name: firmware-hex
+          path: |
+            **/zephyr.hex
