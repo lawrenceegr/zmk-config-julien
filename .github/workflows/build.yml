@@ -58,21 +58,29 @@ jobs:
           SNIPPET="${{ matrix.snippet }}"
           CMAKE_ARGS="${{ matrix.cmake-args }}"
 
-          BUILD_ARGS="-s zmk/app -b $BOARD"
+          # West build arguments
+          WEST_ARGS="-s zmk/app -b $BOARD"
+
+          # CMake arguments (passed after --)
+          CMAKE_EXTRA=""
 
           if [ -n "$SHIELD" ]; then
-            BUILD_ARGS="$BUILD_ARGS -- -DSHIELD=$SHIELD"
+            CMAKE_EXTRA="$CMAKE_EXTRA -DSHIELD=$SHIELD"
           fi
 
           if [ -n "$SNIPPET" ]; then
-            BUILD_ARGS="$BUILD_ARGS -DSNIPPET=$SNIPPET"
+            CMAKE_EXTRA="$CMAKE_EXTRA -DSNIPPET=$SNIPPET"
           fi
 
           if [ -n "$CMAKE_ARGS" ]; then
-            BUILD_ARGS="$BUILD_ARGS $CMAKE_ARGS"
+            CMAKE_EXTRA="$CMAKE_EXTRA $CMAKE_ARGS"
           fi
 
-          west build $BUILD_ARGS
+          if [ -n "$CMAKE_EXTRA" ]; then
+            west build $WEST_ARGS -- $CMAKE_EXTRA
+          else
+            west build $WEST_ARGS
+          fi
 
       - name: Prepare artifacts
         run: |
