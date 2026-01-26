@@ -1,16 +1,6 @@
-upload-hex:
-  needs: build
-  runs-on: ubuntu-latest
-  steps:
-    - name: Download firmware artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: firmware   
-        path: artifacts
+name: Build ZMK firmware
+on: [push, pull_request, workflow_dispatch]
 
-    - name: Upload HEX firmware
-      uses: actions/upload-artifact@v4
-      with:
-        name: firmware-hex
-        path: |
-          artifacts/**/zephyr/zephyr.hex
+jobs:
+  build:
+    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@v0.3
