@@ -1,3 +1,0 @@
-config BOARD_HOLYIOT_18010
-	bool "Ms88sf3 nrf52840 nRF52840 Module"
-	depends on SOC_NRF52840_QIAA

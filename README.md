@@ -27,7 +27,6 @@ source .venv/bin/activate
 ```bash
 cd ~/zmk/app
 west build -b ms88sf3_nrf52840 -- \
-  -DSHIELD=macropad \
   -DZMK_CONFIG="/home/marcus/keyboards-firmware/zmk-config-macropad/config" \
   -DZMK_EXTRA_MODULES="/home/marcus/keyboards-firmware/zmk-config-macropad"
 ```
@@ -69,7 +68,8 @@ Then run the build command again.
 
 ## Configuration Files
 
-- `config/boards/shields/macropad/` - Shield definition (keymap, overlay, config)
+- `config/boards/ms88sf3_nrf52840/` - Board definition
+  - `ms88sf3_nrf52840.dts` - Main devicetree (GPIO pins, matrix, LEDs, sensors, etc.)
+  - `ms88sf3_nrf52840_defconfig` - Kconfig options (BLE, RGB, etc.)
+  - `ms88sf3_nrf52840-pinctrl.dtsi` - Pin control configuration
   - `macropad.keymap` - Key mappings
-  - `macropad.overlay` - Devicetree overlay (GPIO pins, matrix, etc.)
-  - `macropad.conf` - Kconfig options (BLE, RGB, encoders, etc.)

@@ -1,6 +1,5 @@
 board:
   name: ms88sf3_nrf52840
-  full_name: MS88SF3 NRF52840
   vendor: generic
   socs:
     - name: nrf52840
