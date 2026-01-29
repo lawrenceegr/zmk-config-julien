@@ -68,8 +68,8 @@ Then run the build command again.
 
 ## Configuration Files
 
-- `config/boards/ms88sf3_nrf52840/` - Board definition
+- `config/boards/arm/ms88sf3_nrf52840/` - Board definition
   - `ms88sf3_nrf52840.dts` - Main devicetree (GPIO pins, matrix, LEDs, sensors, etc.)
   - `ms88sf3_nrf52840_defconfig` - Kconfig options (BLE, RGB, etc.)
   - `ms88sf3_nrf52840-pinctrl.dtsi` - Pin control configuration
-  - `macropad.keymap` - Key mappings
+  - `ms88sf3_nrf52840.keymap` - Key mappings
