@@ -1,0 +1,7 @@
+# MS88SF3 NRF52840 board configuration
+
+# Copyright (c) 2024 Marcus
+# SPDX-License-Identifier: MIT
+
+config BOARD_MS88SF3_NRF52840
+	select SOC_NRF52840_QIAA

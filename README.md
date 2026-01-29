@@ -69,7 +69,6 @@ Then run the build command again.
 
 ## Configuration Files
 
-- `config/boards/ms88sf3_nrf52840/` - Board definition for MS88SF3 module
 - `config/boards/shields/macropad/` - Shield definition (keymap, overlay, config)
   - `macropad.keymap` - Key mappings
   - `macropad.overlay` - Devicetree overlay (GPIO pins, matrix, etc.)
