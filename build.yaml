@@ -9,6 +9,6 @@
 ---
 include:
   - board: keyboard_h723zg
-    snippet: studio-rpc-usb-uart
-    cmake-args: -DCONFIG_ZMK_STUDIO=y
-    artifact-name: keyboard_h723zg_with_studio
+    # snippet: studio-rpc-usb-uart
+    # cmake-args: -DCONFIG_ZMK_STUDIO=y
+    # artifact-name: keyboard_h723zg_with_studio
