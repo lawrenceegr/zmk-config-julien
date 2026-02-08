@@ -1,5 +1,0 @@
-board:
-  name: keyboard_h723zg
-  vendor: generic
-  socs:
-    - name: stm32h723xx
