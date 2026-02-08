@@ -25,10 +25,7 @@ source .venv/bin/activate
 2. Build the firmware:
 
 ```bash
-cd ~/zmk/app
-west build -b ms88sf3_nrf52840 -- \
-  -DZMK_CONFIG="/home/marcus/keyboards-firmware/zmk-config-macropad/config" \
-  -DZMK_EXTRA_MODULES="/home/marcus/keyboards-firmware/zmk-config-macropad"
+west build -b keyboard_h723zg --   -DZMK_CONFIG="/home/marcus/keyboards-firmware/zmk-config-julien/config"   -DZMK_EXTRA_MODULES="/home/marcus/keyboards-firmware/zmk-config-julien"
 ```
 
 3. Output files are located in `~/zmk/app/build/zephyr/`:
