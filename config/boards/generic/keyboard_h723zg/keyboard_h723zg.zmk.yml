@@ -1,0 +1,14 @@
+file_format: "1"
+id: keyboard_h723zg
+name: Julien Keyboard
+type: board
+arch: arm
+features:
+  - keys
+  - encoder
+outputs:
+  - usb
+url: ""
+revisions:
+  - "0.0.0"
+default_revision: "0.0.0"

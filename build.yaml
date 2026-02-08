@@ -8,7 +8,7 @@
 #
 ---
 include:
-  - board: ms88sf3_nrf52840
+  - board: keyboard_h723zg
     snippet: studio-rpc-usb-uart
     cmake-args: -DCONFIG_ZMK_STUDIO=y
-    artifact-name: macropad_with_studio
+    artifact-name: keyboard_h723zg_with_studio

@@ -1,18 +1,21 @@
 identifier: keyboard_h723zg
-name: Keyboard H723ZG
-type: mcu
+name: JulienKeyboard
+type: keyboard
 arch: arm
 toolchain:
   - zephyr
   - gnuarmemb
+  - xtools
 ram: 320
 flash: 1024
 supported:
-  - uart
   - gpio
-  - counter
   - i2c
+  - counter
+  - uart
   - spi
   - usb_device
   - usbd
   - rtc
+  - kscan
+  - nvs

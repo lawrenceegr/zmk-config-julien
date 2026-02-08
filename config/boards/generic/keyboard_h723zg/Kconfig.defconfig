@@ -5,9 +5,6 @@
 
 if BOARD_KEYBOARD_H723ZG
 
-config BOARD
-	default "keyboard_h723zg"
-
 config ZMK_KEYBOARD_NAME
 	default "Julien Keyboard"
 
