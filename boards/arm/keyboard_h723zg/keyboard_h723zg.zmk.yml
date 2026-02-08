@@ -6,8 +6,10 @@ arch: arm
 features:
   - keys
   - encoder
+  # - studio
 outputs:
   - usb
+#   - ble
 url: ""
 revisions:
   - "0.0.0"
