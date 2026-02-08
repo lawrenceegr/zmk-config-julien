@@ -11,11 +11,11 @@ CONFIG_GPIO=y
 # Enable ZMK outputs
 CONFIG_ZMK_USB=y
 
-# Enable HW stack protection
-CONFIG_HW_STACK_PROTECTION=y
+# HW stack protection disabled - ARCH_HAS_STACK_PROTECTION not available on this SoC
+CONFIG_HW_STACK_PROTECTION=n
 
-# Enable MPU
-CONFIG_ARM_MPU=y
+# MPU disabled - CPU_HAS_MPU not available on this SoC
+CONFIG_ARM_MPU=n
 
 # Enable UART
 CONFIG_SERIAL=y
