@@ -37,7 +37,7 @@ west build -b keyboard_h723zg --   -DZMK_CONFIG="/home/marcus/keyboards-firmware
 ### Using ST-Link (OpenOCD)
 
 ```bash
-openocd -f interface/stlink.cfg -f target/nrf52.cfg \
+openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
   -c "program build/zephyr/zmk.hex verify reset exit"
 ```
 
