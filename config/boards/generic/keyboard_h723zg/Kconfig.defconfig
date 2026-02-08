@@ -1,0 +1,17 @@
+# STM32H723ZG-Based Keyboard configuration
+
+# Copyright (c) 2026 Lawrence Langat <lawrencelangatmi@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+if BOARD_KEYBOARD_H723ZG
+
+config BOARD
+	default "keyboard_h723zg"
+
+config ZMK_KEYBOARD_NAME
+	default "Julien Keyboard"
+
+config ZMK_KSCAN_MATRIX_POLLING
+    default y
+
+endif # BOARD_KEYBOARD_H723ZG
