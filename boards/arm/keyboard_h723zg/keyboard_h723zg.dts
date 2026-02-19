@@ -22,6 +22,14 @@
 		zmk,kscan = &kscan0;
 		zmk,matrix-transform = &default_transform;
 	};
+
+	hid_dev_0: hid_dev_0 {
+		compatible = "zephyr,hid-device";
+		interface-name = "HID0";
+		protocol-code = "keyboard";
+		in-report-size = <64>;
+		in-polling-period-us = <1000>;
+	};
     /* Keyboard matrix */
     kscan0: kscan_matrix {
 		compatible = "zmk,kscan-gpio-matrix";

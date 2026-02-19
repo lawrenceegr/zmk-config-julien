@@ -1,6 +1,6 @@
-# ZMK Config - Macropad
+# ZMK Config - Keyboard
 
-ZMK firmware configuration for MS88SF3 nRF52840-based macropad.
+ZMK firmware configuration for Custom STM32H723ZG-based Keyboard.
 
 ## Prerequisites
 
@@ -65,8 +65,8 @@ Then run the build command again.
 
 ## Configuration Files
 
-- `config/boards/arm/ms88sf3_nrf52840/` - Board definition
-  - `ms88sf3_nrf52840.dts` - Main devicetree (GPIO pins, matrix, LEDs, sensors, etc.)
-  - `ms88sf3_nrf52840_defconfig` - Kconfig options (BLE, RGB, etc.)
-  - `ms88sf3_nrf52840-pinctrl.dtsi` - Pin control configuration
-  - `ms88sf3_nrf52840.keymap` - Key mappings
+- `config/boards/arm/keyboard_h723zg/` - Board definition
+  - `keyboard_h723zg.dts` - Main devicetree (GPIO pins, matrix, LEDs, sensors, etc.)
+  - `keyboard_h723zg_defconfig` - Kconfig options (BLE, RGB, etc.)
+  - `keyboard_h723zg-pinctrl.dtsi` - Pin control configuration
+  - `keyboard_h723zg.keymap` - Key mappings

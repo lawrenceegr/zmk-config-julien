@@ -11,6 +11,9 @@ CONFIG_GPIO=y
 # Enable ZMK outputs
 CONFIG_ZMK_USB=y
 
+# Use new USB device stack for High-Speed ULPI PHY support
+CONFIG_ZMK_USB_STACK_NEXT=y
+
 # HW stack protection disabled - ARCH_HAS_STACK_PROTECTION not available on this SoC
 CONFIG_HW_STACK_PROTECTION=n
 
