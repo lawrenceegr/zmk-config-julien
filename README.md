@@ -25,6 +25,7 @@ source .venv/bin/activate
 2. Build the firmware:
 
 ```bash
+cd ~/zmk/app
 west build -b keyboard_h723zg --   -DZMK_CONFIG="/home/marcus/keyboards-firmware/zmk-config-julien/config"   -DZMK_EXTRA_MODULES="/home/marcus/keyboards-firmware/zmk-config-julien"
 ```
 
