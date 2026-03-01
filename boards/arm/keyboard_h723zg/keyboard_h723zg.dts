@@ -21,6 +21,13 @@
 		zephyr,dtcm = &dtcm;
 		zmk,kscan = &kscan0;
 		zmk,matrix-transform = &default_transform;
+		zmk,indicators = &leds;
+		zmk,underglow = &rgb_bridge;
+	};
+
+	rgb_bridge: rgb_bridge {
+		compatible = "keyboard,is31fl3733-bridge";
+		chain-length = <88>;
 	};
 
 	hid_dev_0: hid_dev_0 {
@@ -77,13 +84,12 @@
 		>;
 	};
 
-    leds {
-        compatible = "gpio-leds";
-        caps_lock_led: led_caps {
-            gpios = <&gpiod 7 GPIO_ACTIVE_HIGH>;
-            label = "Caps Lock LED";
-        };
-    };
+	leds: leds {
+		compatible = "gpio-leds";
+		caps_lock_led: caps_lock {
+			gpios = <&gpiod 7 GPIO_ACTIVE_HIGH>;
+		};
+	};
 
 	otghs_ulpi_phy: otghs_ulpis_phy {
 		compatible = "usb-ulpi-phy";
@@ -141,6 +147,14 @@
 	pinctrl-names = "default";
 	status = "okay";
 	clock-frequency = <I2C_BITRATE_FAST>;
+
+	led_driver1: is31fl3733@50 {
+		compatible = "issi,is31fl3733";
+		reg = <0x50>;
+		sdb-gpios = <&gpiod 11 GPIO_ACTIVE_HIGH>;
+		current-limit = <0xff>;
+		sync-mode = "none";
+	};
 };
 
 &i2c2 {
@@ -148,6 +162,14 @@
 	pinctrl-names = "default";
 	status = "okay";
 	clock-frequency = <I2C_BITRATE_FAST>;
+
+	led_driver2: is31fl3733@50 {
+		compatible = "issi,is31fl3733";
+		reg = <0x50>;
+		sdb-gpios = <&gpiod 11 GPIO_ACTIVE_HIGH>;
+		current-limit = <0xff>;
+		sync-mode = "none";
+	};
 };
 
 zephyr_udc0: &usbotg_hs {

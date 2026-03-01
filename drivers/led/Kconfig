@@ -1,0 +1,6 @@
+config IS31FL3733_BRIDGE
+	bool "IS31FL3733 to LED strip bridge"
+	depends on LED
+	help
+	  Wraps the two IS31FL3733 LED matrix devices as a single led_strip
+	  device so ZMK RGB underglow can drive them.

@@ -1,9 +1,21 @@
 # SPDX-License-Identifier: Apache-2.0
 
-CONFIG_BOARD_KEYBOARD_H723ZG=y 
+CONFIG_BOARD_KEYBOARD_H723ZG=y
 
 # Enable GPIO
 CONFIG_GPIO=y
+
+# Enable I2C for LED drivers
+CONFIG_I2C=y
+
+# IS31FL3733 per-key RGB LED drivers (U3 on i2c4, U4 on i2c2)
+# IS31FL3733 driver auto-selects from DT node; no explicit CONFIG_IS31FL3733 needed
+CONFIG_LED=y
+
+# LED strip bridge + ZMK RGB underglow
+CONFIG_IS31FL3733_BRIDGE=y
+CONFIG_ZMK_RGB_UNDERGLOW=y
+CONFIG_ZMK_RGB_UNDERGLOW_EXT_POWER=n
 
 # Use pinctrl
 # CONFIG_PINCTRL=y

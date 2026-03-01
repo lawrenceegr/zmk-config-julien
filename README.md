@@ -64,6 +64,69 @@ rm -rf ~/zmk/app/build
 
 Then run the build command again.
 
+## RGB Hardware
+
+Per-key RGB is driven by two **ISSI IS31FL3733-QF** LED matrix controllers (88 LEDs total).
+
+| IC | Label | I2C Bus | Zephyr I2C | Address | Sync Role | LEDs |
+|----|-------|---------|------------|---------|-----------|------|
+| U3 | `led_driver1` | SDA1 / SCL1 (PF15 / PF14) | `i2c4` | 0x50 | Master | 64 (SW1–SW12 × CS1–CS16) |
+| U4 | `led_driver2` | SDA2 / SCL2 (PF0 / PF1)  | `i2c2` | 0x50 | Slave  | 24 (SW1–SW6  × CS1–CS14) |
+
+Both drivers share a **LEDS_SHUTDOWN** net connected to their SDB pins (active-high enable) on **PD11**. `sdb-gpios = <&gpiod 11 GPIO_ACTIVE_HIGH>` is set on both DTS nodes.
+
+### LED addressing (IS31FL3733)
+
+Each driver has a 12-row × 16-column matrix. LED index within a driver:
+
+```
+index = (SW_row - 1) * 16 + (CS_col - 1)
+```
+
+Per-key RGB mapping (which matrix position corresponds to which physical key) is TBD and will be configured once the full LED layout is confirmed.
+
+### ZMK RGB integration status
+
+ZMK's `zmk,rgb-underglow` expects a `led_strip`-API device. IS31FL3733 uses Zephyr's `led` API. A thin bridge ZMK module is needed to expose the two IS31FL3733 devices as a combined LED strip. This is planned but not yet implemented — the DTS and Kconfig are in place as the hardware foundation.
+
+## Keymap
+
+### Default Layer
+
+Standard QWERTY layout with full-size 104-key arrangement.
+
+### RGB Layer (hold second RCTRL)
+
+#### F Row — Media Keys
+
+| Key | Action |
+|-----|--------|
+| F1  | Screen brightness down |
+| F2  | Screen brightness up |
+| F5  | Previous track |
+| F6  | Play / Pause |
+| F7  | Next track |
+| F8  | Stop |
+| F9  | Mute |
+| F10 | Volume down |
+| F11 | Volume up |
+
+#### Letter Keys — RGB Control
+
+| Key | Action |
+|-----|--------|
+| Q   | Toggle RGB |
+| W   | Brightness down |
+| E   | Brightness up |
+| R   | Effect previous |
+| T   | Effect next |
+| A   | Saturation down |
+| S   | Saturation up |
+| D   | Hue down |
+| F   | Hue up |
+
+Number row is reserved for lighting mode selection (to be mapped).
+
 ## Configuration Files
 
 - `config/boards/arm/keyboard_h723zg/` - Board definition
