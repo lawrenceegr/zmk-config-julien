@@ -1,6 +1,6 @@
 description: IS31FL3733 LED matrix to LED strip bridge
 
-compatible: "keyboard,is31fl3733-bridge"
+compatible: "zmk,is31fl3733-bridge"
 
 include: base.yaml
 

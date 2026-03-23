@@ -4,18 +4,9 @@
  *
  * Bridges two IS31FL3733 LED matrix devices into a single led_strip device
  * for ZMK RGB underglow.
- *
- * Physical layout (placeholder — update column counts and pixel ordering
- * once the per-key PCB layout is confirmed):
- *
- *   Driver 1 (led_driver1, i2c4): 4 RGB groups × 16 cols = 64 pixels  [0–63]
- *   Driver 2 (led_driver2, i2c2): 2 RGB groups × 12 cols = 24 pixels  [64–87]
- *
- * Each RGB group uses 3 consecutive SW rows: SW(n)=R, SW(n+1)=G, SW(n+2)=B.
- * IS31FL3733 PWM channel index = (SW_row - 1) × 16 + (CS_col - 1).
  */
 
-#define DT_DRV_COMPAT keyboard_is31fl3733_bridge
+#define DT_DRV_COMPAT zmk_is31fl3733_bridge
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
@@ -26,15 +17,15 @@
 LOG_MODULE_REGISTER(is31fl3733_bridge, CONFIG_LED_LOG_LEVEL);
 
 #define IS31_COLS     16
-#define IS31_LEDS     192  /* 12 SW rows × 16 CS cols */
+#define IS31_LEDS     192
 
 #define DRV1_GROUPS   4
 #define DRV1_COLS     16
-#define DRV1_PIXELS   63   /* 4 RGB groups × 16 cols, last group has 15 LEDs */
+#define DRV1_PIXELS   63
 
 #define DRV2_GROUPS   2
-#define DRV2_COLS     14   /* group 0 = 13 cols (CS1–CS13), group 1 = 12 cols */
-#define DRV2_PIXELS   25   /* 13 + 12 = 25 */
+#define DRV2_COLS     14
+#define DRV2_PIXELS   25
 
 struct bridge_cfg {
 	uint32_t chain_length;
@@ -46,7 +37,7 @@ static size_t bridge_length(const struct device *dev)
 }
 
 static int bridge_update_rgb(const struct device *dev,
-			     struct led_rgb *pixels, size_t num_pixels)
+				 struct led_rgb *pixels, size_t num_pixels)
 {
 	const struct device *drv1 = DEVICE_DT_GET(DT_NODELABEL(led_driver1));
 	const struct device *drv2 = DEVICE_DT_GET(DT_NODELABEL(led_driver2));
@@ -98,6 +89,6 @@ static const struct led_strip_driver_api bridge_api = {
 		.chain_length = DT_INST_PROP(n, chain_length),              \
 	};                                                                  \
 	DEVICE_DT_INST_DEFINE(n, NULL, NULL, NULL, &bridge_cfg_##n,        \
-			      POST_KERNEL, 90, &bridge_api);
+				  POST_KERNEL, 90, &bridge_api);
 
 DT_INST_FOREACH_STATUS_OKAY(BRIDGE_DEFINE)
