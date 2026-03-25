@@ -68,7 +68,8 @@
 					<&gpiof 4 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>,
 					<&gpiof 5 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>,
 					<&gpiof 10 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>,
-					<&gpiof 11 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>;
+					<&gpiof 11 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>,
+					<&gpiof 12 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>;
 	};
 
 	default_transform: keymap_transform_0 {
@@ -82,6 +83,7 @@
 			RC(3,0) RC(3,1) RC(3,2) RC(3,3) RC(3,4) RC(3,5) RC(3,6) RC(3,7) RC(3,8) RC(3,9) RC(3,10) RC(3,11) RC(3,12)          
 			RC(4,0) RC(4,1) RC(4,2) RC(4,3) RC(4,4) RC(4,5) RC(4,6) RC(4,7) RC(4,8) RC(4,9) RC(4,10) RC(4,11) RC(4,12)                   RC(4,15)
 			RC(5,0) RC(5,1) RC(5,2)                         RC(5,6)                         RC(5,10) RC(5,11) RC(5,12) RC(5,13) RC(5,14) RC(5,15) RC(5,16)
+			RC(6,1) RC(6,3) RC(6,5) RC(6,8) RC(6,10) RC(6,12) RC(6,14)
 		>;
 	};
 
@@ -96,6 +98,20 @@
 		compatible = "usb-ulpi-phy";
 		#phy-cells = <0>;
 	};
+
+    right_encoder: encoder_right {
+        compatible = "alps,ec11";
+		a-gpios = <&gpiod 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_UP)>;
+		b-gpios = <&gpiod 5 (GPIO_ACTIVE_HIGH | GPIO_PULL_UP)>;
+        steps = <12>;
+		status = "okay";
+    };
+
+	sensors: sensors {
+        compatible = "zmk,keymap-sensors";
+        sensors = <&right_encoder>;
+        triggers-per-rotation = <12>;
+    };
 };
 
 &flash0 {

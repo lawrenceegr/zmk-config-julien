@@ -20,10 +20,12 @@
                 &kp CAPS        &kp FR_Q        &kp FR_S        &kp FR_D        &kp FR_F        &kp FR_G        &kp FR_H        &kp FR_J        &kp FR_K        &kp FR_L        &kp FR_M        &kp FR_U_GRAVE  &kp FR_ASTRK
                 &kp LSHFT       &kp FR_LT       &kp FR_W        &kp FR_X        &kp FR_C        &kp FR_V        &kp FR_B        &kp FR_N        &kp FR_COMMA    &kp FR_SEMI     &kp FR_COLON    &kp FR_EXCL     &kp RSHFT                                       &kp UP
                 &kp LCTRL       &kp LGUI        &kp LALT                                                        &kp SPACE                                                       &kp RALT        &mo 1           &kp K_APP       &kp RCTRL       &kp LEFT        &kp DOWN        &kp RIGHT
+                &rgb_ug RGB_EFF &rgb_ug RGB_BRI &kp K_LOCK      &kp K_PP        &kp K_PREV        &kp K_NEXT        &kp K_MUTE 
             >;
+            sensor-bindings = <&inc_dec_kp C_VOL_UP C_VOL_DN>;
         };
 
-        rgb_layer {
+        fn_layer {
             bindings = <
                 &trans    &kp C_BRI_DN  &kp C_BRI_UP  &trans    &trans    &kp C_PREV  &kp C_PP  &kp C_NEXT  &kp C_STOP  &kp C_MUTE  &kp C_VOL_DN  &kp C_VOL_UP  &trans              &trans    &trans    &trans
                 &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans
@@ -31,7 +33,9 @@
                 &trans    &rgb_ug RGB_SAD  &rgb_ug RGB_SAI  &rgb_ug RGB_HUD  &rgb_ug RGB_HUI  &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans
                 &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans    &trans                        &trans
                 &trans    &trans    &trans                                    &trans                                &trans    &trans    &trans    &trans    &trans    &trans    &trans
+                &rgb_ug RGB_EFR    &rgb_ug RGB_BRD    &trans    &trans    &trans    &trans    &trans
             >;
+            sensor-bindings = <&inc_dec_kp C_VOL_UP C_VOL_DN>;
         };
     };
 };
