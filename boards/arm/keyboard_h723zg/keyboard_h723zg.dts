@@ -8,6 +8,7 @@
 #include <st/h7/stm32h723zgtx-pinctrl.dtsi>
 #include <dt-bindings/zmk/matrix_transform.h>
 #include <dt-bindings/led/led.h>
+#include "../keyboard_h723zg-layouts.dtsi"
 
 / {
 	model = "Custom STM32H723ZG-based Keyboard";
@@ -21,7 +22,6 @@
 		zephyr,dtcm = &dtcm;
 		zephyr,settings-partition = &storage_partition;
 		zmk,kscan = &kscan0;
-		zmk,matrix-transform = &default_transform;
 		zmk,indicators = &leds;
 		zmk,underglow = &rgb_bridge;
 	};
