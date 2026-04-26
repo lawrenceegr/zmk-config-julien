@@ -8,7 +8,7 @@
 #include <st/h7/stm32h723zgtx-pinctrl.dtsi>
 #include <dt-bindings/zmk/matrix_transform.h>
 #include <dt-bindings/led/led.h>
-#include "../keyboard_h723zg-layouts.dtsi"
+#include "keyboard_h723zg-layouts.dtsi"
 
 / {
 	model = "Custom STM32H723ZG-based Keyboard";

@@ -26,7 +26,7 @@ source .venv/bin/activate
 
 ```bash
 cd ~/zmk/app
-west build -b keyboard_h723zg --   -DZMK_CONFIG="/home/marcus/keyboards-firmware/zmk-config-julien/config"   -DZMK_EXTRA_MODULES="/home/marcus/keyboards-firmware/zmk-config-julien"
+west build -b keyboard_h723zg --   -DZMK_CONFIG="/home/marcus/keyboards-firmware/zmk-config-julien/config"   -DZMK_EXTRA_MODULES="/home/marcus/keyboards-firmware/zmk-config-julien -DSNIPPET=studio-rpc-usb-uart-next -DCONFIG_ZMK_STUDIO=y"
 ```
 
 3. Output files are located in `~/zmk/app/build/zephyr/`:
