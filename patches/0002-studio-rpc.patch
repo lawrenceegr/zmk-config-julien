@@ -1,0 +1,76 @@
+From 2870a18e5edf3b7063f2bafc1b0a415bbbcda952 Mon Sep 17 00:00:00 2001
+From: lawrenceegr <lawrencelangatmi@gmail.com>
+Date: Fri, 27 Mar 2026 16:12:22 +0300
+Subject: [PATCH 2/5] studio rpc
+
+---
+ .../studio-rpc-usb-uart-next/snippet.yml      |  8 +++++++
+ .../studio-rpc-usb-uart-next.conf             |  9 +++++++
+ .../studio-rpc-usb-uart-next.overlay          | 24 +++++++++++++++++++
+ 3 files changed, 41 insertions(+)
+ create mode 100644 app/snippets/studio-rpc-usb-uart-next/snippet.yml
+ create mode 100644 app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.conf
+ create mode 100644 app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.overlay
+
+diff --git a/app/snippets/studio-rpc-usb-uart-next/snippet.yml b/app/snippets/studio-rpc-usb-uart-next/snippet.yml
+new file mode 100644
+index 00000000..237f1229
+--- /dev/null
++++ b/app/snippets/studio-rpc-usb-uart-next/snippet.yml
+@@ -0,0 +1,8 @@
++# Copyright (c) 2024 The ZMK Contributors
++# SPDX-License-Identifier: MIT
++
++name: studio-rpc-usb-uart-next
++append:
++  DTS_EXTRA_CPPFLAGS: -DZMK_BEHAVIORS_KEEP_ALL
++  EXTRA_DTC_OVERLAY_FILE: studio-rpc-usb-uart-next.overlay
++  EXTRA_CONF_FILE: studio-rpc-usb-uart-next.conf
+diff --git a/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.conf b/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.conf
+new file mode 100644
+index 00000000..59c17631
+--- /dev/null
++++ b/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.conf
+@@ -0,0 +1,9 @@
++# Copyright (c) 2024 The ZMK Contributors
++# SPDX-License-Identifier: MIT
++
++CONFIG_ZMK_USB=y
++CONFIG_ZMK_USB_STACK_NEXT=y
++CONFIG_USBD_CDC_ACM_CLASS=y
++CONFIG_SERIAL=y
++CONFIG_UART_INTERRUPT_DRIVEN=y
++CONFIG_UART_LINE_CTRL=y
+diff --git a/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.overlay b/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.overlay
+new file mode 100644
+index 00000000..8e1f2c91
+--- /dev/null
++++ b/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.overlay
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (c) 2024 The ZMK Contributors
++ *
++ * SPDX-License-Identifier: MIT
++ *
++ * Overlay for ZMK Studio RPC over USB CDC ACM (new USB device stack).
++ * Adds the CDC ACM UART node under zephyr_udc0 and wires it to ZMK Studio.
++ *
++ * The physical layout is defined in keyboard_h723zg-layouts.dtsi, included
++ * by the board's DTS. The board's DTS must also have zmk,matrix-transform
++ * removed from chosen (replaced by a zmk,physical-layout node).
++ */
++
++&zephyr_udc0 {
++    snippet_studio_rpc_usb_uart_next: snippet_studio_rpc_usb_uart_next {
++        compatible = "zephyr,cdc-acm-uart";
++    };
++};
++
++/ {
++    chosen {
++        zmk,studio-rpc-uart = &snippet_studio_rpc_usb_uart_next;
++    };
++};
+-- 
+2.43.0
+

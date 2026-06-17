@@ -1,0 +1,1005 @@
+From ca4909782ddb95fe65a5fe372c52c57a6c9e9123 Mon Sep 17 00:00:00 2001
+From: lawrenceegr <lawrencelangatmi@gmail.com>
+Date: Sun, 8 Feb 2026 18:39:28 +0300
+Subject: [PATCH 1/5] initial attempt to enable usbotg
+
+---
+ app/CMakeLists.txt                            |   4 +-
+ app/Kconfig                                   |  50 +++-
+ .../corneish_zen/widgets/battery_status.c     |  14 +-
+ .../nice_view/widgets/peripheral_status.c     |  12 +-
+ app/boards/shields/nice_view/widgets/status.c |  14 +-
+ app/boards/shields/nice_view/widgets/util.h   |   2 +-
+ .../zmk/events/usb_conn_state_changed.h       |   1 -
+ app/include/zmk/hid.h                         |   3 +-
+ app/include/zmk/usb.h                         |  21 +-
+ app/src/activity.c                            |   6 +-
+ app/src/display/widgets/battery_status.c      |  14 +-
+ app/src/usb.c                                 | 219 +++++++++++++++--
+ app/src/usb_hid.c                             | 227 +++++++++++++++++-
+ 13 files changed, 510 insertions(+), 77 deletions(-)
+
+diff --git a/app/CMakeLists.txt b/app/CMakeLists.txt
+index cc38244a..9e236cc7 100644
+--- a/app/CMakeLists.txt
++++ b/app/CMakeLists.txt
+@@ -40,7 +40,7 @@ target_sources(app PRIVATE src/events/activity_state_changed.c)
+ target_sources(app PRIVATE src/events/position_state_changed.c)
+ target_sources(app PRIVATE src/events/sensor_event.c)
+ target_sources_ifdef(CONFIG_ZMK_WPM app PRIVATE src/events/wpm_state_changed.c)
+-target_sources_ifdef(CONFIG_USB_DEVICE_STACK app PRIVATE src/events/usb_conn_state_changed.c)
++target_sources_ifdef(CONFIG_ZMK_USB app PRIVATE src/events/usb_conn_state_changed.c)
+ target_sources(app PRIVATE src/behaviors/behavior_reset.c)
+ target_sources_ifdef(CONFIG_ZMK_EXT_POWER app PRIVATE src/behaviors/behavior_ext_power.c)
+ target_sources_ifdef(CONFIG_ZMK_BEHAVIOR_SOFT_OFF app PRIVATE src/behaviors/behavior_soft_off.c)
+@@ -99,7 +99,7 @@ target_sources_ifdef(CONFIG_ZMK_HID_INDICATORS app PRIVATE src/events/hid_indica
+ target_sources_ifdef(CONFIG_ZMK_SPLIT app PRIVATE src/events/split_peripheral_status_changed.c)
+ add_subdirectory_ifdef(CONFIG_ZMK_SPLIT src/split)
+ 
+-target_sources_ifdef(CONFIG_USB_DEVICE_STACK app PRIVATE src/usb.c)
++target_sources_ifdef(CONFIG_ZMK_USB app PRIVATE src/usb.c)
+ target_sources_ifdef(CONFIG_ZMK_USB app PRIVATE src/usb_hid.c)
+ target_sources_ifdef(CONFIG_ZMK_RGB_UNDERGLOW app PRIVATE src/rgb_underglow.c)
+ target_sources_ifdef(CONFIG_ZMK_BACKLIGHT app PRIVATE src/backlight.c)
+diff --git a/app/Kconfig b/app/Kconfig
+index e1c4ada9..b3693eb6 100644
+--- a/app/Kconfig
++++ b/app/Kconfig
+@@ -10,20 +10,36 @@ menu "Basic Keyboard Setup"
+ config ZMK_KEYBOARD_NAME
+     string "Keyboard Name"
+ 
+-config USB_DEVICE_PRODUCT
++config ZMK_USB_VID
++    hex "USB Vendor ID"
++    default 0x1D50
++
++config ZMK_USB_PID
++    hex "USB Product ID"
++    default 0x615E
++
++config ZMK_USB_MANUFACTURER
++    string "USB manufacturer string"
++    default "ZMK Project"
++
++config ZMK_USB_PRODUCT
++    string "USB product string"
+     default ZMK_KEYBOARD_NAME
+ 
++config USB_DEVICE_PRODUCT
++    default ZMK_USB_PRODUCT
++
+ config BT_DEVICE_NAME
+     default ZMK_KEYBOARD_NAME
+ 
+ config USB_DEVICE_VID
+-    default 0x1D50
++    default ZMK_USB_VID
+ 
+ config USB_DEVICE_PID
+-    default 0x615E
++    default ZMK_USB_PID
+ 
+ config USB_DEVICE_MANUFACTURER
+-    default "ZMK Project"
++    default ZMK_USB_MANUFACTURER
+ 
+ config BT_DIS_PNP_VID
+     default 0x1D50
+@@ -122,18 +138,34 @@ config ZMK_USB
+     bool "USB"
+     depends on (!ZMK_SPLIT || (ZMK_SPLIT && ZMK_SPLIT_ROLE_CENTRAL))
+     select USB
++
++choice ZMK_USB_STACK
++    prompt "USB Device Stack"
++    depends on ZMK_USB
++    default ZMK_USB_STACK_LEGACY
++
++config ZMK_USB_STACK_LEGACY
++    bool "Legacy USB Device Stack"
+     select USB_DEVICE_STACK
+     select USB_DEVICE_HID
+ 
++config ZMK_USB_STACK_NEXT
++    bool "New USB Device Stack (required for High-Speed ULPI)"
++    select USB_DEVICE_STACK_NEXT
++    select USBD_HID_SUPPORT
++
++endchoice
++
+ config ZMK_USB_BOOT
+     bool "USB Boot Protocol Support"
+     depends on ZMK_USB
++    depends on ZMK_USB_STACK_LEGACY
+     select USB_HID_BOOT_PROTOCOL
+ 
+ config USB_DEVICE_INITIALIZE_AT_BOOT
+     default n
+ 
+-if ZMK_USB
++if ZMK_USB && ZMK_USB_STACK_LEGACY
+ 
+ config USB_NUMOF_EP_WRITE_RETRIES
+     default 10
+@@ -141,7 +173,7 @@ config USB_NUMOF_EP_WRITE_RETRIES
+ config USB_HID_POLL_INTERVAL_MS
+     default 1
+ 
+-endif # ZMK_USB
++endif # ZMK_USB && ZMK_USB_STACK_LEGACY
+ 
+ menuconfig ZMK_BLE
+     bool "BLE (HID over GATT)"
+@@ -328,7 +360,7 @@ config ZMK_RGB_UNDERGLOW_AUTO_OFF_IDLE
+ 
+ config ZMK_RGB_UNDERGLOW_AUTO_OFF_USB
+     bool "Turn off RGB underglow when USB is disconnected"
+-    depends on USB_DEVICE_STACK
++    depends on ZMK_USB
+ 
+ endif # ZMK_RGB_UNDERGLOW
+ 
+@@ -477,7 +509,7 @@ rsource "src/boot/Kconfig"
+ 
+ menu "Initialization Priorities"
+ 
+-if USB_DEVICE_STACK
++if ZMK_USB
+ 
+ config ZMK_USB_INIT_PRIORITY
+     int "USB Init Priority"
+@@ -487,7 +519,7 @@ config ZMK_USB_HID_INIT_PRIORITY
+     int "USB HID Init Priority"
+     default 95
+ 
+-endif # USB
++endif # ZMK_USB
+ 
+ if ZMK_BLE || ZMK_SPLIT_BLE
+ 
+diff --git a/app/boards/lowprokb/corneish_zen/widgets/battery_status.c b/app/boards/lowprokb/corneish_zen/widgets/battery_status.c
+index 044d3cee..62032d2b 100644
+--- a/app/boards/lowprokb/corneish_zen/widgets/battery_status.c
++++ b/app/boards/lowprokb/corneish_zen/widgets/battery_status.c
+@@ -22,7 +22,7 @@ static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
+ 
+ struct battery_status_state {
+     uint8_t level;
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+     bool usb_present;
+ #endif
+ };
+@@ -43,7 +43,7 @@ LV_IMG_DECLARE(batt_0_chg);
+ static void set_battery_symbol(lv_obj_t *icon, struct battery_status_state state) {
+     uint8_t level = state.level;
+ 
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+     if (level > 95) {
+         lv_image_set_src(icon, state.usb_present ? &batt_100_chg : &batt_100);
+     } else if (level > 74) {
+@@ -57,7 +57,7 @@ static void set_battery_symbol(lv_obj_t *icon, struct battery_status_state state
+     } else {
+         lv_image_set_src(icon, state.usb_present ? &batt_0_chg : &batt_0);
+     }
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+ }
+ 
+ void battery_status_update_cb(struct battery_status_state state) {
+@@ -70,9 +70,9 @@ static struct battery_status_state battery_status_get_state(const zmk_event_t *e
+ 
+     return (struct battery_status_state){
+         .level = (ev != NULL) ? ev->state_of_charge : zmk_battery_state_of_charge(),
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+         .usb_present = zmk_usb_is_powered(),
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+     };
+ }
+ 
+@@ -80,9 +80,9 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_status, struct battery_status_state,
+                             battery_status_update_cb, battery_status_get_state)
+ 
+ ZMK_SUBSCRIPTION(widget_battery_status, zmk_battery_state_changed);
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+ ZMK_SUBSCRIPTION(widget_battery_status, zmk_usb_conn_state_changed);
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+ 
+ int zmk_widget_battery_status_init(struct zmk_widget_battery_status *widget, lv_obj_t *parent) {
+     widget->obj = lv_image_create(parent);
+diff --git a/app/boards/shields/nice_view/widgets/peripheral_status.c b/app/boards/shields/nice_view/widgets/peripheral_status.c
+index 40c338d3..96847cd1 100644
+--- a/app/boards/shields/nice_view/widgets/peripheral_status.c
++++ b/app/boards/shields/nice_view/widgets/peripheral_status.c
+@@ -56,9 +56,9 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
+ 
+ static void set_battery_status(struct zmk_widget_status *widget,
+                                struct battery_status_state state) {
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+     widget->state.charging = state.usb_present;
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+ 
+     widget->state.battery = state.level;
+ 
+@@ -73,9 +73,9 @@ static void battery_status_update_cb(struct battery_status_state state) {
+ static struct battery_status_state battery_status_get_state(const zmk_event_t *eh) {
+     return (struct battery_status_state){
+         .level = zmk_battery_state_of_charge(),
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+         .usb_present = zmk_usb_is_powered(),
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+     };
+ }
+ 
+@@ -83,9 +83,9 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_status, struct battery_status_state,
+                             battery_status_update_cb, battery_status_get_state)
+ 
+ ZMK_SUBSCRIPTION(widget_battery_status, zmk_battery_state_changed);
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+ ZMK_SUBSCRIPTION(widget_battery_status, zmk_usb_conn_state_changed);
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+ 
+ static struct peripheral_status_state get_state(const zmk_event_t *_eh) {
+     return (struct peripheral_status_state){.connected = zmk_split_bt_peripheral_is_connected()};
+diff --git a/app/boards/shields/nice_view/widgets/status.c b/app/boards/shields/nice_view/widgets/status.c
+index 601ff546..355e8fa3 100644
+--- a/app/boards/shields/nice_view/widgets/status.c
++++ b/app/boards/shields/nice_view/widgets/status.c
+@@ -206,9 +206,9 @@ static void draw_bottom(lv_obj_t *widget, const struct status_state *state) {
+ 
+ static void set_battery_status(struct zmk_widget_status *widget,
+                                struct battery_status_state state) {
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+     widget->state.charging = state.usb_present;
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+ 
+     widget->state.battery = state.level;
+ 
+@@ -225,9 +225,9 @@ static struct battery_status_state battery_status_get_state(const zmk_event_t *e
+ 
+     return (struct battery_status_state){
+         .level = (ev != NULL) ? ev->state_of_charge : zmk_battery_state_of_charge(),
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+         .usb_present = zmk_usb_is_powered(),
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+     };
+ }
+ 
+@@ -235,9 +235,9 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_status, struct battery_status_state,
+                             battery_status_update_cb, battery_status_get_state)
+ 
+ ZMK_SUBSCRIPTION(widget_battery_status, zmk_battery_state_changed);
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+ ZMK_SUBSCRIPTION(widget_battery_status, zmk_usb_conn_state_changed);
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+ 
+ static void set_output_status(struct zmk_widget_status *widget,
+                               const struct output_status_state *state) {
+@@ -277,7 +277,7 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_output_status, struct output_status_state,
+                             output_status_update_cb, output_status_get_state)
+ ZMK_SUBSCRIPTION(widget_output_status, zmk_endpoint_changed);
+ 
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+ ZMK_SUBSCRIPTION(widget_output_status, zmk_usb_conn_state_changed);
+ #endif
+ #if defined(CONFIG_ZMK_BLE)
+diff --git a/app/boards/shields/nice_view/widgets/util.h b/app/boards/shields/nice_view/widgets/util.h
+index 183d0ec3..51fd80cd 100644
+--- a/app/boards/shields/nice_view/widgets/util.h
++++ b/app/boards/shields/nice_view/widgets/util.h
+@@ -41,7 +41,7 @@ struct status_state {
+ 
+ struct battery_status_state {
+     uint8_t level;
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+     bool usb_present;
+ #endif
+ };
+diff --git a/app/include/zmk/events/usb_conn_state_changed.h b/app/include/zmk/events/usb_conn_state_changed.h
+index 5f4ac5d2..1d44a5c7 100644
+--- a/app/include/zmk/events/usb_conn_state_changed.h
++++ b/app/include/zmk/events/usb_conn_state_changed.h
+@@ -7,7 +7,6 @@
+ #pragma once
+ 
+ #include <zephyr/kernel.h>
+-#include <zephyr/usb/usb_device.h>
+ 
+ #include <zmk/event_manager.h>
+ #include <zmk/usb.h>
+diff --git a/app/include/zmk/hid.h b/app/include/zmk/hid.h
+index 962180e7..81ef3171 100644
+--- a/app/include/zmk/hid.h
++++ b/app/include/zmk/hid.h
+@@ -8,8 +8,7 @@
+ 
+ #include <zephyr/sys/util.h>
+ 
+-#include <zephyr/usb/usb_device.h>
+-#include <zephyr/usb/class/usb_hid.h>
++#include <zephyr/usb/class/hid.h>
+ 
+ #include <zmk/keys.h>
+ #if IS_ENABLED(CONFIG_ZMK_POINTING)
+diff --git a/app/include/zmk/usb.h b/app/include/zmk/usb.h
+index a5e5089f..cfea9121 100644
+--- a/app/include/zmk/usb.h
++++ b/app/include/zmk/usb.h
+@@ -6,9 +6,6 @@
+ 
+ #pragma once
+ 
+-#include <zephyr/usb/usb_device.h>
+-#include <zephyr/usb/class/usb_hid.h>
+-
+ #include <zmk/keys.h>
+ #include <zmk/hid.h>
+ 
+@@ -18,10 +15,26 @@ enum zmk_usb_conn_state {
+     ZMK_USB_CONN_HID,
+ };
+ 
+-enum usb_dc_status_code zmk_usb_get_status(void);
++enum zmk_usb_status {
++    ZMK_USB_STATUS_UNKNOWN,
++    ZMK_USB_STATUS_DISCONNECTED,
++    ZMK_USB_STATUS_CONNECTED,
++    ZMK_USB_STATUS_CONFIGURED,
++    ZMK_USB_STATUS_SUSPENDED,
++    ZMK_USB_STATUS_RESUMED,
++    ZMK_USB_STATUS_RESET,
++    ZMK_USB_STATUS_ERROR,
++};
++
++enum zmk_usb_status zmk_usb_get_status(void);
+ enum zmk_usb_conn_state zmk_usb_get_conn_state(void);
+ 
+ static inline bool zmk_usb_is_powered(void) {
+     return zmk_usb_get_conn_state() != ZMK_USB_CONN_NONE;
+ }
+ bool zmk_usb_is_hid_ready(void);
++
++#if IS_ENABLED(CONFIG_ZMK_USB_STACK_NEXT)
++#include <zephyr/usb/usbd.h>
++struct usbd_context *zmk_usb_get_usbd_context(void);
++#endif
+diff --git a/app/src/activity.c b/app/src/activity.c
+index f4dc3562..d21b74bb 100644
+--- a/app/src/activity.c
++++ b/app/src/activity.c
+@@ -22,7 +22,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+ 
+ #include <zmk/activity.h>
+ 
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+ #include <zmk/usb.h>
+ #endif
+ 
+@@ -31,11 +31,11 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+ #endif
+ 
+ bool is_usb_power_present(void) {
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+     return zmk_usb_is_powered();
+ #else
+     return false;
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+ }
+ 
+ static enum zmk_activity_state activity_state;
+diff --git a/app/src/display/widgets/battery_status.c b/app/src/display/widgets/battery_status.c
+index 22e73faf..9f09b4de 100644
+--- a/app/src/display/widgets/battery_status.c
++++ b/app/src/display/widgets/battery_status.c
+@@ -21,7 +21,7 @@ static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
+ 
+ struct battery_status_state {
+     uint8_t level;
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+     bool usb_present;
+ #endif
+ };
+@@ -31,11 +31,11 @@ static void set_battery_symbol(lv_obj_t *label, struct battery_status_state stat
+ 
+     uint8_t level = state.level;
+ 
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+     if (state.usb_present) {
+         strcpy(text, LV_SYMBOL_CHARGE " ");
+     }
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+ 
+ #if IS_ENABLED(CONFIG_ZMK_WIDGET_BATTERY_STATUS_SHOW_PERCENTAGE)
+     char perc[5] = {};
+@@ -67,9 +67,9 @@ static struct battery_status_state battery_status_get_state(const zmk_event_t *e
+ 
+     return (struct battery_status_state){
+         .level = (ev != NULL) ? ev->state_of_charge : zmk_battery_state_of_charge(),
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+         .usb_present = zmk_usb_is_powered(),
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+     };
+ }
+ 
+@@ -77,9 +77,9 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_status, struct battery_status_state,
+                             battery_status_update_cb, battery_status_get_state)
+ 
+ ZMK_SUBSCRIPTION(widget_battery_status, zmk_battery_state_changed);
+-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
++#if IS_ENABLED(CONFIG_ZMK_USB)
+ ZMK_SUBSCRIPTION(widget_battery_status, zmk_usb_conn_state_changed);
+-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
++#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+ 
+ int zmk_widget_battery_status_init(struct zmk_widget_battery_status *widget, lv_obj_t *parent) {
+     widget->obj = lv_label_create(parent);
+diff --git a/app/src/usb.c b/app/src/usb.c
+index cf76341e..eb0bd812 100644
+--- a/app/src/usb.c
++++ b/app/src/usb.c
+@@ -7,19 +7,15 @@
+ #include <zephyr/device.h>
+ #include <zephyr/init.h>
+ 
+-#include <zephyr/usb/usb_device.h>
+-#include <zephyr/usb/class/usb_hid.h>
+-
++#include <zmk/usb.h>
+ #include <zmk/hid.h>
+ #include <zmk/keymap.h>
+ #include <zmk/event_manager.h>
+ #include <zmk/events/usb_conn_state_changed.h>
+ 
+-#include <zmk/usb_hid.h>
+-
+ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+ 
+-static enum usb_dc_status_code usb_status = USB_DC_UNKNOWN;
++static enum zmk_usb_status usb_status = ZMK_USB_STATUS_UNKNOWN;
+ static bool is_configured;
+ 
+ static void raise_usb_status_changed_event(struct k_work *_work) {
+@@ -29,20 +25,18 @@ static void raise_usb_status_changed_event(struct k_work *_work) {
+ 
+ K_WORK_DEFINE(usb_status_notifier_work, raise_usb_status_changed_event);
+ 
+-enum usb_dc_status_code zmk_usb_get_status(void) { return usb_status; }
++enum zmk_usb_status zmk_usb_get_status(void) { return usb_status; }
+ 
+ enum zmk_usb_conn_state zmk_usb_get_conn_state(void) {
+     LOG_DBG("state: %d", usb_status);
+     switch (usb_status) {
+-    case USB_DC_SUSPEND:
+-    case USB_DC_CONFIGURED:
+-    case USB_DC_RESUME:
+-    case USB_DC_CLEAR_HALT:
+-    case USB_DC_SOF:
++    case ZMK_USB_STATUS_SUSPENDED:
++    case ZMK_USB_STATUS_CONFIGURED:
++    case ZMK_USB_STATUS_RESUMED:
+         return ZMK_USB_CONN_HID;
+ 
+-    case USB_DC_DISCONNECTED:
+-    case USB_DC_UNKNOWN:
++    case ZMK_USB_STATUS_DISCONNECTED:
++    case ZMK_USB_STATUS_UNKNOWN:
+         return ZMK_USB_CONN_NONE;
+ 
+     default:
+@@ -54,9 +48,166 @@ bool zmk_usb_is_hid_ready(void) {
+     return zmk_usb_get_conn_state() == ZMK_USB_CONN_HID && is_configured;
+ }
+ 
+-void usb_status_cb(enum usb_dc_status_code status, const uint8_t *params) {
+-    // Start-of-frame events are too frequent and noisy to notify, and they're
+-    // not used within ZMK
++#if IS_ENABLED(CONFIG_ZMK_USB_STACK_NEXT)
++
++/* ===== New USB Device Stack Implementation ===== */
++
++#include <zephyr/usb/usbd.h>
++
++USBD_DEVICE_DEFINE(zmk_usbd,
++                   DEVICE_DT_GET(DT_NODELABEL(zephyr_udc0)),
++                   CONFIG_ZMK_USB_VID, CONFIG_ZMK_USB_PID);
++
++USBD_DESC_LANG_DEFINE(zmk_lang);
++USBD_DESC_MANUFACTURER_DEFINE(zmk_mfr, CONFIG_ZMK_USB_MANUFACTURER);
++USBD_DESC_PRODUCT_DEFINE(zmk_product, CONFIG_ZMK_USB_PRODUCT);
++USBD_DESC_SERIAL_NUMBER_DEFINE(zmk_sn);
++
++USBD_DESC_CONFIG_DEFINE(zmk_fs_cfg_desc, "FS Configuration");
++USBD_DESC_CONFIG_DEFINE(zmk_hs_cfg_desc, "HS Configuration");
++
++static const uint8_t zmk_usb_attributes = USB_SCD_REMOTE_WAKEUP;
++
++USBD_CONFIGURATION_DEFINE(zmk_fs_config, zmk_usb_attributes, 50, &zmk_fs_cfg_desc);
++USBD_CONFIGURATION_DEFINE(zmk_hs_config, zmk_usb_attributes, 50, &zmk_hs_cfg_desc);
++
++struct usbd_context *zmk_usb_get_usbd_context(void) { return &zmk_usbd; }
++
++static void zmk_usbd_msg_cb(struct usbd_context *const usbd_ctx,
++                            const struct usbd_msg *const msg) {
++    LOG_INF("USBD message: %s", usbd_msg_type_string(msg->type));
++
++    switch (msg->type) {
++    case USBD_MSG_CONFIGURATION:
++        LOG_INF("  Configuration value %d", msg->status);
++        usb_status = ZMK_USB_STATUS_CONFIGURED;
++        is_configured = (msg->status != 0);
++        break;
++    case USBD_MSG_SUSPEND:
++        usb_status = ZMK_USB_STATUS_SUSPENDED;
++        break;
++    case USBD_MSG_RESUME:
++        usb_status = ZMK_USB_STATUS_RESUMED;
++        break;
++    case USBD_MSG_RESET:
++        usb_status = ZMK_USB_STATUS_RESET;
++        is_configured = false;
++        break;
++    case USBD_MSG_UDC_ERROR:
++    case USBD_MSG_STACK_ERROR:
++        usb_status = ZMK_USB_STATUS_ERROR;
++        is_configured = false;
++        break;
++    case USBD_MSG_VBUS_READY:
++        usb_status = ZMK_USB_STATUS_CONNECTED;
++        if (usbd_enable(usbd_ctx)) {
++            LOG_ERR("Failed to enable device support");
++        }
++        return;
++    case USBD_MSG_VBUS_REMOVED:
++        usb_status = ZMK_USB_STATUS_DISCONNECTED;
++        is_configured = false;
++        if (usbd_disable(usbd_ctx)) {
++            LOG_ERR("Failed to disable device support");
++        }
++        break;
++    default:
++        return;
++    }
++
++    k_work_submit(&usb_status_notifier_work);
++}
++
++static int zmk_usb_init(void) {
++    int err;
++
++    err = usbd_add_descriptor(&zmk_usbd, &zmk_lang);
++    if (err) {
++        LOG_ERR("Failed to initialize language descriptor (%d)", err);
++        return err;
++    }
++
++    err = usbd_add_descriptor(&zmk_usbd, &zmk_mfr);
++    if (err) {
++        LOG_ERR("Failed to initialize manufacturer descriptor (%d)", err);
++        return err;
++    }
++
++    err = usbd_add_descriptor(&zmk_usbd, &zmk_product);
++    if (err) {
++        LOG_ERR("Failed to initialize product descriptor (%d)", err);
++        return err;
++    }
++
++    err = usbd_add_descriptor(&zmk_usbd, &zmk_sn);
++    if (err) {
++        LOG_ERR("Failed to initialize SN descriptor (%d)", err);
++        return err;
++    }
++
++    /* Add high-speed configuration if supported */
++    if (usbd_caps_speed(&zmk_usbd) == USBD_SPEED_HS) {
++        err = usbd_add_configuration(&zmk_usbd, USBD_SPEED_HS, &zmk_hs_config);
++        if (err) {
++            LOG_ERR("Failed to add High-Speed configuration");
++            return err;
++        }
++
++        err = usbd_register_all_classes(&zmk_usbd, USBD_SPEED_HS, 1, NULL);
++        if (err) {
++            LOG_ERR("Failed to register HS classes");
++            return err;
++        }
++
++        usbd_device_set_code_triple(&zmk_usbd, USBD_SPEED_HS, 0, 0, 0);
++    }
++
++    /* Add full-speed configuration */
++    err = usbd_add_configuration(&zmk_usbd, USBD_SPEED_FS, &zmk_fs_config);
++    if (err) {
++        LOG_ERR("Failed to add Full-Speed configuration");
++        return err;
++    }
++
++    err = usbd_register_all_classes(&zmk_usbd, USBD_SPEED_FS, 1, NULL);
++    if (err) {
++        LOG_ERR("Failed to register FS classes");
++        return err;
++    }
++
++    usbd_device_set_code_triple(&zmk_usbd, USBD_SPEED_FS, 0, 0, 0);
++
++    err = usbd_msg_register_cb(&zmk_usbd, zmk_usbd_msg_cb);
++    if (err) {
++        LOG_ERR("Failed to register message callback");
++        return err;
++    }
++
++    err = usbd_init(&zmk_usbd);
++    if (err) {
++        LOG_ERR("Failed to initialize device support");
++        return err;
++    }
++
++    if (!usbd_can_detect_vbus(&zmk_usbd)) {
++        err = usbd_enable(&zmk_usbd);
++        if (err) {
++            LOG_ERR("Failed to enable device support");
++            return err;
++        }
++    }
++
++    return 0;
++}
++
++#else /* Legacy USB Device Stack */
++
++#include <zephyr/usb/usb_device.h>
++#include <zephyr/usb/class/usb_hid.h>
++#include <zmk/usb_hid.h>
++
++static void usb_status_cb(enum usb_dc_status_code status, const uint8_t *params) {
++    // Start-of-frame events are too frequent and noisy to notify
+     if (status == USB_DC_SOF) {
+         return;
+     }
+@@ -66,14 +217,40 @@ void usb_status_cb(enum usb_dc_status_code status, const uint8_t *params) {
+         zmk_usb_hid_set_protocol(HID_PROTOCOL_REPORT);
+     }
+ #endif
+-    usb_status = status;
++
++    switch (status) {
++    case USB_DC_SUSPEND:
++        usb_status = ZMK_USB_STATUS_SUSPENDED;
++        break;
++    case USB_DC_CONFIGURED:
++        usb_status = ZMK_USB_STATUS_CONFIGURED;
++        break;
++    case USB_DC_RESUME:
++    case USB_DC_CLEAR_HALT:
++    case USB_DC_SOF:
++        usb_status = ZMK_USB_STATUS_RESUMED;
++        break;
++    case USB_DC_DISCONNECTED:
++        usb_status = ZMK_USB_STATUS_DISCONNECTED;
++        break;
++    case USB_DC_ERROR:
++        usb_status = ZMK_USB_STATUS_ERROR;
++        break;
++    case USB_DC_RESET:
++        usb_status = ZMK_USB_STATUS_RESET;
++        break;
++    default:
++        usb_status = ZMK_USB_STATUS_UNKNOWN;
++        break;
++    }
++
+     if (zmk_usb_get_conn_state() == ZMK_USB_CONN_HID) {
+-        is_configured |= usb_status == USB_DC_CONFIGURED;
++        is_configured |= usb_status == ZMK_USB_STATUS_CONFIGURED;
+     } else {
+         is_configured = false;
+     }
+     k_work_submit(&usb_status_notifier_work);
+-};
++}
+ 
+ static int zmk_usb_init(void) {
+     int usb_enable_ret;
+@@ -88,4 +265,6 @@ static int zmk_usb_init(void) {
+     return 0;
+ }
+ 
++#endif /* CONFIG_ZMK_USB_STACK_NEXT */
++
+ SYS_INIT(zmk_usb_init, APPLICATION, CONFIG_ZMK_USB_INIT_PRIORITY);
+diff --git a/app/src/usb_hid.c b/app/src/usb_hid.c
+index 9adc7db8..f18e451a 100644
+--- a/app/src/usb_hid.c
++++ b/app/src/usb_hid.c
+@@ -7,9 +7,6 @@
+ #include <zephyr/device.h>
+ #include <zephyr/init.h>
+ 
+-#include <zephyr/usb/usb_device.h>
+-#include <zephyr/usb/class/usb_hid.h>
+-
+ #include <zmk/usb.h>
+ #include <zmk/hid.h>
+ #include <zmk/keymap.h>
+@@ -30,6 +27,214 @@ static const struct device *hid_dev;
+ 
+ static K_SEM_DEFINE(hid_sem, 1, 1);
+ 
++#if IS_ENABLED(CONFIG_ZMK_USB_STACK_NEXT)
++
++/* ===== New USB Device Stack HID Implementation ===== */
++
++#include <zephyr/usb/usbd.h>
++#include <zephyr/usb/class/usbd_hid.h>
++
++static void zmk_usb_hid_iface_ready(const struct device *dev, const bool ready) {
++    LOG_INF("HID interface %s", ready ? "ready" : "not ready");
++    if (ready) {
++        k_sem_give(&hid_sem);
++    }
++}
++
++static int zmk_usb_hid_get_report(const struct device *dev,
++                                  const uint8_t type, const uint8_t id,
++                                  const uint16_t len, uint8_t *const buf) {
++    switch (type) {
++    case HID_REPORT_TYPE_INPUT:
++        switch (id) {
++        case ZMK_HID_REPORT_ID_KEYBOARD: {
++            struct zmk_hid_keyboard_report *report = zmk_hid_get_keyboard_report();
++            uint16_t report_size = sizeof(*report);
++            if (len < report_size) {
++                return -EINVAL;
++            }
++            memcpy(buf, (uint8_t *)report, report_size);
++            return report_size;
++        }
++        case ZMK_HID_REPORT_ID_CONSUMER: {
++            struct zmk_hid_consumer_report *report = zmk_hid_get_consumer_report();
++            uint16_t report_size = sizeof(*report);
++            if (len < report_size) {
++                return -EINVAL;
++            }
++            memcpy(buf, (uint8_t *)report, report_size);
++            return report_size;
++        }
++        default:
++            LOG_ERR("Invalid input report ID %d requested", id);
++            return -EINVAL;
++        }
++        break;
++    case HID_REPORT_TYPE_FEATURE:
++        switch (id) {
++#if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
++        case ZMK_HID_REPORT_ID_MOUSE: {
++            struct zmk_hid_mouse_resolution_feature_report res_report;
++            struct zmk_endpoint_instance endpoint = {
++                .transport = ZMK_TRANSPORT_USB,
++            };
++            struct zmk_pointing_resolution_multipliers mult =
++                zmk_pointing_resolution_multipliers_get_profile(endpoint);
++            res_report.report_id = ZMK_HID_REPORT_ID_MOUSE;
++            res_report.body.wheel_res = mult.wheel;
++            res_report.body.hwheel_res = mult.hor_wheel;
++            uint16_t report_size = sizeof(res_report);
++            if (len < report_size) {
++                return -EINVAL;
++            }
++            memcpy(buf, (uint8_t *)&res_report, report_size);
++            return report_size;
++        }
++#endif // IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
++        default:
++            return -ENOTSUP;
++        }
++        break;
++    default:
++        return -ENOTSUP;
++    }
++}
++
++static int zmk_usb_hid_set_report(const struct device *dev,
++                                  const uint8_t type, const uint8_t id,
++                                  const uint16_t len, const uint8_t *const buf) {
++    switch (type) {
++    case HID_REPORT_TYPE_OUTPUT:
++        switch (id) {
++#if IS_ENABLED(CONFIG_ZMK_HID_INDICATORS)
++        case ZMK_HID_REPORT_ID_LEDS:
++            if (len != sizeof(struct zmk_hid_led_report)) {
++                LOG_ERR("LED set report is malformed: length=%d", len);
++                return -EINVAL;
++            } else {
++                struct zmk_endpoint_instance endpoint = {
++                    .transport = ZMK_TRANSPORT_USB,
++                };
++                zmk_hid_indicators_process_report(
++                    &((const struct zmk_hid_led_report *)buf)->body, endpoint);
++            }
++            return 0;
++#endif // IS_ENABLED(CONFIG_ZMK_HID_INDICATORS)
++        default:
++            LOG_ERR("Invalid output report ID %d", id);
++            return -EINVAL;
++        }
++        break;
++    case HID_REPORT_TYPE_FEATURE:
++        switch (id) {
++#if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
++        case ZMK_HID_REPORT_ID_MOUSE:
++            if (len != sizeof(struct zmk_hid_mouse_resolution_feature_report)) {
++                return -EINVAL;
++            }
++            struct zmk_endpoint_instance ep = {
++                .transport = ZMK_TRANSPORT_USB,
++            };
++            zmk_pointing_resolution_multipliers_process_report(
++                &((const struct zmk_hid_mouse_resolution_feature_report *)buf)->body, ep);
++            return 0;
++#endif // IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
++        default:
++            return -ENOTSUP;
++        }
++        break;
++    default:
++        return -ENOTSUP;
++    }
++}
++
++static void zmk_usb_hid_input_report_done(const struct device *dev,
++                                           const uint8_t *const report) {
++    k_sem_give(&hid_sem);
++}
++
++static void zmk_usb_hid_set_protocol_cb(const struct device *dev, const uint8_t proto) {
++    LOG_INF("HID protocol changed to %s", proto ? "Report" : "Boot");
++}
++
++static const struct hid_device_ops zmk_hid_ops = {
++    .iface_ready = zmk_usb_hid_iface_ready,
++    .get_report = zmk_usb_hid_get_report,
++    .set_report = zmk_usb_hid_set_report,
++    .input_report_done = zmk_usb_hid_input_report_done,
++    .set_protocol = zmk_usb_hid_set_protocol_cb,
++};
++
++static int zmk_usb_hid_send_report(const uint8_t *report, size_t len) {
++    enum zmk_usb_status status = zmk_usb_get_status();
++
++    switch (status) {
++    case ZMK_USB_STATUS_SUSPENDED: {
++        struct usbd_context *ctx = zmk_usb_get_usbd_context();
++        return usbd_wakeup_request(ctx);
++    }
++    case ZMK_USB_STATUS_ERROR:
++    case ZMK_USB_STATUS_RESET:
++    case ZMK_USB_STATUS_DISCONNECTED:
++    case ZMK_USB_STATUS_UNKNOWN:
++        return -ENODEV;
++    default:
++        k_sem_take(&hid_sem, K_MSEC(30));
++        int err = hid_device_submit_report(hid_dev, len, report);
++
++        if (err) {
++            k_sem_give(&hid_sem);
++        }
++
++        return err;
++    }
++}
++
++int zmk_usb_hid_send_keyboard_report(void) {
++    struct zmk_hid_keyboard_report *report = zmk_hid_get_keyboard_report();
++    return zmk_usb_hid_send_report((uint8_t *)report, sizeof(*report));
++}
++
++int zmk_usb_hid_send_consumer_report(void) {
++    struct zmk_hid_consumer_report *report = zmk_hid_get_consumer_report();
++    return zmk_usb_hid_send_report((uint8_t *)report, sizeof(*report));
++}
++
++#if IS_ENABLED(CONFIG_ZMK_POINTING)
++int zmk_usb_hid_send_mouse_report(void) {
++    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
++    return zmk_usb_hid_send_report((uint8_t *)report, sizeof(*report));
++}
++#endif // IS_ENABLED(CONFIG_ZMK_POINTING)
++
++void zmk_usb_hid_set_protocol(uint8_t protocol) {
++    /* Not used in new stack - protocol changes come via set_protocol callback */
++}
++
++static int zmk_usb_hid_init(void) {
++    int ret;
++
++    hid_dev = DEVICE_DT_GET_ONE(zephyr_hid_device);
++    if (!device_is_ready(hid_dev)) {
++        LOG_ERR("HID device is not ready");
++        return -EIO;
++    }
++
++    ret = hid_device_register(hid_dev, zmk_hid_report_desc,
++                              sizeof(zmk_hid_report_desc), &zmk_hid_ops);
++    if (ret != 0) {
++        LOG_ERR("Failed to register HID device, %d", ret);
++        return ret;
++    }
++
++    return 0;
++}
++
++#else /* Legacy USB Device Stack */
++
++#include <zephyr/usb/usb_device.h>
++#include <zephyr/usb/class/usb_hid.h>
++
+ static void in_ready_cb(const struct device *dev) { k_sem_give(&hid_sem); }
+ 
+ #define HID_GET_REPORT_TYPE_MASK 0xff00
+@@ -186,12 +391,12 @@ static const struct hid_ops ops = {
+ 
+ static int zmk_usb_hid_send_report(const uint8_t *report, size_t len) {
+     switch (zmk_usb_get_status()) {
+-    case USB_DC_SUSPEND:
++    case ZMK_USB_STATUS_SUSPENDED:
+         return usb_wakeup_request();
+-    case USB_DC_ERROR:
+-    case USB_DC_RESET:
+-    case USB_DC_DISCONNECTED:
+-    case USB_DC_UNKNOWN:
++    case ZMK_USB_STATUS_ERROR:
++    case ZMK_USB_STATUS_RESET:
++    case ZMK_USB_STATUS_DISCONNECTED:
++    case ZMK_USB_STATUS_UNKNOWN:
+         return -ENODEV;
+     default:
+         k_sem_take(&hid_sem, K_MSEC(30));
+@@ -235,6 +440,10 @@ int zmk_usb_hid_send_mouse_report() {
+ }
+ #endif // IS_ENABLED(CONFIG_ZMK_POINTING)
+ 
++#if !IS_ENABLED(CONFIG_ZMK_USB_BOOT)
++void zmk_usb_hid_set_protocol(uint8_t protocol) {}
++#endif
++
+ static int zmk_usb_hid_init(void) {
+     hid_dev = device_get_binding("HID_0");
+     if (hid_dev == NULL) {
+@@ -253,4 +462,6 @@ static int zmk_usb_hid_init(void) {
+     return 0;
+ }
+ 
++#endif /* CONFIG_ZMK_USB_STACK_NEXT */
++
+ SYS_INIT(zmk_usb_hid_init, APPLICATION, CONFIG_ZMK_USB_HID_INIT_PRIORITY);
+-- 
+2.43.0
+

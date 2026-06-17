@@ -1,0 +1,129 @@
+From 61eb661835853430b972258bdcdda220dc571e35 Mon Sep 17 00:00:00 2001
+From: lawrenceegr <lawrencelangatmi@gmail.com>
+Date: Wed, 15 Apr 2026 16:50:17 +0300
+Subject: [PATCH 4/5] another studio attempt
+
+---
+ .../studio-rpc-usb-uart-next.conf                 |  1 +
+ app/src/studio/rpc.c                              | 15 ++-------------
+ app/src/studio/uart_rpc_transport.c               | 11 +++++++----
+ 3 files changed, 10 insertions(+), 17 deletions(-)
+
+diff --git a/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.conf b/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.conf
+index bee08363..413ab326 100644
+--- a/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.conf
++++ b/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.conf
+@@ -7,4 +7,5 @@ CONFIG_USBD_CDC_ACM_CLASS=y
+ CONFIG_SERIAL=y
+ CONFIG_UART_INTERRUPT_DRIVEN=y
+ CONFIG_UART_LINE_CTRL=y
++CONFIG_ZMK_STUDIO_RPC_TX_BUF_SIZE=256
+ CONFIG_ZMK_STUDIO_LOG_LEVEL_DBG=y
+diff --git a/app/src/studio/rpc.c b/app/src/studio/rpc.c
+index 7925990c..b0213b3e 100644
+--- a/app/src/studio/rpc.c
++++ b/app/src/studio/rpc.c
+@@ -85,8 +85,6 @@ void zmk_rpc_rx_notify(void) { k_sem_give(&rpc_rx_sem); }
+ static bool rpc_read_cb(pb_istream_t *stream, uint8_t *buf, size_t count) {
+     uint32_t write_offset = 0;
+ 
+-    printk("rpc_read_cb: enter count=%zu framing=%d\n", count, rpc_framing_state);
+-
+     do {
+         uint8_t *buffer;
+         uint32_t len = ring_buf_get_claim(&rpc_rx_buf, &buffer, count - write_offset);
+@@ -101,16 +99,12 @@ static bool rpc_read_cb(pb_istream_t *stream, uint8_t *buf, size_t count) {
+                 }
+             }
+         } else {
+-            printk("rpc_read_cb: blocking write_offset=%d count=%zu\n", write_offset, count);
+             k_sem_take(&rpc_rx_sem, K_FOREVER);
+-            printk("rpc_read_cb: unblocked\n");
+         }
+ 
+         ring_buf_get_finish(&rpc_rx_buf, len);
+     } while (write_offset < count && rpc_framing_state != FRAMING_STATE_EOF);
+ 
+-    printk("rpc_read_cb: exit write_offset=%d framing=%d\n", write_offset, rpc_framing_state);
+-
+     if (rpc_framing_state == FRAMING_STATE_EOF) {
+         stream->bytes_left = 0;
+         return false;
+@@ -223,9 +217,7 @@ exit:
+ }
+ 
+ static void rpc_main(void) {
+-    printk("rpc_main: thread started\n");
+     for (;;) {
+-        printk("rpc_main: waiting for request\n");
+         pb_istream_t stream = pb_istream_for_rx_ring_buf();
+         zmk_studio_Request req = zmk_studio_Request_init_zero;
+ #if IS_ENABLED(CONFIG_THREAD_ANALYZER)
+@@ -233,16 +225,13 @@ static void rpc_main(void) {
+ #endif // IS_ENABLED(CONFIG_THREAD_ANALYZER)
+         bool status = pb_decode(&stream, &zmk_studio_Request_msg, &req);
+ 
+-        printk("rpc_main: pb_decode returned %d\n", (int)status);
+         rpc_framing_state = FRAMING_STATE_IDLE;
+ 
+         if (status) {
+-            printk("rpc_main: RPC decode ok subsystem=%d\n", req.which_subsystem);
++            LOG_DBG("RPC decode ok, subsystem %d", req.which_subsystem);
+             zmk_studio_Response resp = handle_request(&req);
+ 
+-            printk("rpc_main: calling send_response\n");
+             int err = send_response(&resp);
+-            printk("rpc_main: send_response returned %d\n", err);
+ #if IS_ENABLED(CONFIG_THREAD_ANALYZER)
+             thread_analyzer_print(0);
+ #endif // IS_ENABLED(CONFIG_THREAD_ANALYZER)
+@@ -250,7 +239,7 @@ static void rpc_main(void) {
+                 LOG_ERR("Failed to send the RPC response %d", err);
+             }
+         } else {
+-            printk("rpc_main: decode failed\n");
++            LOG_DBG("Decode failed");
+         }
+     }
+ }
+diff --git a/app/src/studio/uart_rpc_transport.c b/app/src/studio/uart_rpc_transport.c
+index 0cd8f5a7..43379400 100644
+--- a/app/src/studio/uart_rpc_transport.c
++++ b/app/src/studio/uart_rpc_transport.c
+@@ -22,7 +22,7 @@ static const struct device *const uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
+ 
+ static void tx_notify(struct ring_buf *tx_ring_buf, size_t written, bool msg_done,
+                       void *user_data) {
+-    if (msg_done || (ring_buf_size_get(tx_ring_buf) > (ring_buf_capacity_get(tx_ring_buf) / 2))) {
++    if (msg_done) {
+ #if IS_ENABLED(CONFIG_UART_INTERRUPT_DRIVEN)
+         uart_irq_tx_enable(uart_dev);
+ #else
+@@ -125,7 +125,6 @@ static void serial_cb(const struct device *dev, void *user_data) {
+     if (uart_irq_tx_ready(uart_dev)) {
+         struct ring_buf *tx_buf = zmk_rpc_get_tx_buf();
+         uint32_t len;
+-        printk("serial_cb: TX ready, buf size=%d\n", ring_buf_size_get(tx_buf));
+         while ((len = ring_buf_size_get(tx_buf)) > 0) {
+             uint8_t *buf;
+             uint32_t claim_len = ring_buf_get_claim(tx_buf, &buf, tx_buf->size);
+@@ -135,10 +134,14 @@ static void serial_cb(const struct device *dev, void *user_data) {
+             }
+ 
+             int sent = uart_fifo_fill(uart_dev, buf, claim_len);
+-            printk("serial_cb: TX fifo_fill claim=%d sent=%d\n", claim_len, sent);
++
+             ring_buf_get_finish(tx_buf, MAX(sent, 0));
+         }
+-        printk("serial_cb: TX drain done\n");
++
++        /* Disable TX IRQ when buffer is empty to prevent irq_cb_work from
++         * spinning indefinitely. uart_irq_tx_enable is called again by
++         * tx_notify when new data is available. */
++        uart_irq_tx_disable(uart_dev);
+     }
+ }
+ 
+-- 
+2.43.0
+

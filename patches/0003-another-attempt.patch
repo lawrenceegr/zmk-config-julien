@@ -1,0 +1,136 @@
+From 90a3ac5f59b6695d6f678fce66db152b8d52c946 Mon Sep 17 00:00:00 2001
+From: lawrenceegr <lawrencelangatmi@gmail.com>
+Date: Sat, 11 Apr 2026 21:44:42 +0300
+Subject: [PATCH 3/5] another attempt
+
+---
+ .../studio-rpc-usb-uart-next.conf             |  1 +
+ app/src/studio/rpc.c                          | 22 ++++++++++++++++---
+ app/src/studio/uart_rpc_transport.c           |  4 +++-
+ 3 files changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.conf b/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.conf
+index 59c17631..bee08363 100644
+--- a/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.conf
++++ b/app/snippets/studio-rpc-usb-uart-next/studio-rpc-usb-uart-next.conf
+@@ -7,3 +7,4 @@ CONFIG_USBD_CDC_ACM_CLASS=y
+ CONFIG_SERIAL=y
+ CONFIG_UART_INTERRUPT_DRIVEN=y
+ CONFIG_UART_LINE_CTRL=y
++CONFIG_ZMK_STUDIO_LOG_LEVEL_DBG=y
+diff --git a/app/src/studio/rpc.c b/app/src/studio/rpc.c
+index e79b5568..7925990c 100644
+--- a/app/src/studio/rpc.c
++++ b/app/src/studio/rpc.c
+@@ -85,6 +85,8 @@ void zmk_rpc_rx_notify(void) { k_sem_give(&rpc_rx_sem); }
+ static bool rpc_read_cb(pb_istream_t *stream, uint8_t *buf, size_t count) {
+     uint32_t write_offset = 0;
+ 
++    printk("rpc_read_cb: enter count=%zu framing=%d\n", count, rpc_framing_state);
++
+     do {
+         uint8_t *buffer;
+         uint32_t len = ring_buf_get_claim(&rpc_rx_buf, &buffer, count - write_offset);
+@@ -92,16 +94,23 @@ static bool rpc_read_cb(pb_istream_t *stream, uint8_t *buf, size_t count) {
+         if (len > 0) {
+             for (int i = 0; i < len; i++) {
+                 if (studio_framing_process_byte(&rpc_framing_state, buffer[i])) {
+-                    buf[write_offset++] = buffer[i];
++                    if (buf) {
++                        buf[write_offset] = buffer[i];
++                    }
++                    write_offset++;
+                 }
+             }
+         } else {
++            printk("rpc_read_cb: blocking write_offset=%d count=%zu\n", write_offset, count);
+             k_sem_take(&rpc_rx_sem, K_FOREVER);
++            printk("rpc_read_cb: unblocked\n");
+         }
+ 
+         ring_buf_get_finish(&rpc_rx_buf, len);
+     } while (write_offset < count && rpc_framing_state != FRAMING_STATE_EOF);
+ 
++    printk("rpc_read_cb: exit write_offset=%d framing=%d\n", write_offset, rpc_framing_state);
++
+     if (rpc_framing_state == FRAMING_STATE_EOF) {
+         stream->bytes_left = 0;
+         return false;
+@@ -180,6 +189,7 @@ static int send_response(const zmk_studio_Response *resp) {
+     k_mutex_lock(&rpc_transport_mutex, K_FOREVER);
+ 
+     if (!selected_transport) {
++        LOG_WRN("send_response: no transport selected");
+         goto exit;
+     }
+ 
+@@ -213,7 +223,9 @@ exit:
+ }
+ 
+ static void rpc_main(void) {
++    printk("rpc_main: thread started\n");
+     for (;;) {
++        printk("rpc_main: waiting for request\n");
+         pb_istream_t stream = pb_istream_for_rx_ring_buf();
+         zmk_studio_Request req = zmk_studio_Request_init_zero;
+ #if IS_ENABLED(CONFIG_THREAD_ANALYZER)
+@@ -221,12 +233,16 @@ static void rpc_main(void) {
+ #endif // IS_ENABLED(CONFIG_THREAD_ANALYZER)
+         bool status = pb_decode(&stream, &zmk_studio_Request_msg, &req);
+ 
++        printk("rpc_main: pb_decode returned %d\n", (int)status);
+         rpc_framing_state = FRAMING_STATE_IDLE;
+ 
+         if (status) {
++            printk("rpc_main: RPC decode ok subsystem=%d\n", req.which_subsystem);
+             zmk_studio_Response resp = handle_request(&req);
+ 
++            printk("rpc_main: calling send_response\n");
+             int err = send_response(&resp);
++            printk("rpc_main: send_response returned %d\n", err);
+ #if IS_ENABLED(CONFIG_THREAD_ANALYZER)
+             thread_analyzer_print(0);
+ #endif // IS_ENABLED(CONFIG_THREAD_ANALYZER)
+@@ -234,13 +250,13 @@ static void rpc_main(void) {
+                 LOG_ERR("Failed to send the RPC response %d", err);
+             }
+         } else {
+-            LOG_DBG("Decode failed");
++            printk("rpc_main: decode failed\n");
+         }
+     }
+ }
+ 
+ K_THREAD_DEFINE(studio_rpc_thread, CONFIG_ZMK_STUDIO_RPC_THREAD_STACK_SIZE, rpc_main, NULL, NULL,
+-                NULL, K_LOWEST_APPLICATION_THREAD_PRIO, 0, 0);
++                NULL, K_PRIO_PREEMPT(5), 0, 0);
+ 
+ static void refresh_selected_transport(void) {
+     enum zmk_transport transport = zmk_endpoint_get_selected().transport;
+diff --git a/app/src/studio/uart_rpc_transport.c b/app/src/studio/uart_rpc_transport.c
+index 6dcac6d1..0cd8f5a7 100644
+--- a/app/src/studio/uart_rpc_transport.c
++++ b/app/src/studio/uart_rpc_transport.c
+@@ -125,6 +125,7 @@ static void serial_cb(const struct device *dev, void *user_data) {
+     if (uart_irq_tx_ready(uart_dev)) {
+         struct ring_buf *tx_buf = zmk_rpc_get_tx_buf();
+         uint32_t len;
++        printk("serial_cb: TX ready, buf size=%d\n", ring_buf_size_get(tx_buf));
+         while ((len = ring_buf_size_get(tx_buf)) > 0) {
+             uint8_t *buf;
+             uint32_t claim_len = ring_buf_get_claim(tx_buf, &buf, tx_buf->size);
+@@ -134,9 +135,10 @@ static void serial_cb(const struct device *dev, void *user_data) {
+             }
+ 
+             int sent = uart_fifo_fill(uart_dev, buf, claim_len);
+-
++            printk("serial_cb: TX fifo_fill claim=%d sent=%d\n", claim_len, sent);
+             ring_buf_get_finish(tx_buf, MAX(sent, 0));
+         }
++        printk("serial_cb: TX drain done\n");
+     }
+ }
+ 
+-- 
+2.43.0
+
