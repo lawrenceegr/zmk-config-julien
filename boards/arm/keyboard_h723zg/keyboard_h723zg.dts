@@ -24,6 +24,8 @@
 		zmk,kscan = &kscan0;
 		zmk,indicators = &leds;
 		zmk,underglow = &rgb_bridge;
+		zmk,physical-layout = &default_layout;
+		zmk,configurator-uart = &configurator_cdc_acm;
 	};
 
 	rgb_bridge: rgb_bridge {
@@ -241,4 +243,7 @@ zephyr_udc0: &usbotg_hs {
 		 <&rcc STM32_SRC_HSI48 USB_SEL(3)>;
 	phys = <&otghs_ulpi_phy>;
 	status = "okay";
+	configurator_cdc_acm: configurator_cdc_acm {
+    	compatible = "zephyr,cdc-acm-uart";
+	};
 };
