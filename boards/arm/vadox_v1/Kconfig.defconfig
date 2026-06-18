@@ -3,10 +3,10 @@
 # Copyright (c) 2026 Lawrence Langat <lawrencelangatmi@gmail.com>
 # SPDX-License-Identifier: Apache-2.0
 
-if BOARD_KEYBOARD_H723ZG
+if BOARD_VADOX_V1
 
 config ZMK_KEYBOARD_NAME
-	default "Julien Keyboard"
+	default "Vadox V1"
 
 config ZMK_KSCAN_MATRIX_POLLING
     default y
@@ -20,4 +20,4 @@ config ZMK_KSCAN_MATRIX_WAIT_BEFORE_INPUTS
 # config BT_CTLR
 #     default BT 
 
-endif # BOARD_KEYBOARD_H723ZG
+endif # BOARD_VADOX_V1

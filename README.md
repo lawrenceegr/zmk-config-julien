@@ -1,6 +1,7 @@
-# ZMK Config - Keyboard
+# Vadox V1 — ZMK Config
 
-ZMK firmware configuration for Custom STM32H723ZG-based Keyboard.
+ZMK firmware configuration for the Vadox V1, a custom STM32H723ZG-based unibody keyboard
+(board id `vadox_v1`).
 
 ## Prerequisites
 
@@ -26,7 +27,7 @@ source .venv/bin/activate
 
 ```bash
 cd ~/zmk/app
-west build -b keyboard_h723zg --   -DZMK_CONFIG="/home/marcus/keyboards-firmware/zmk-config-julien/config"   -DZMK_EXTRA_MODULES="/home/marcus/keyboards-firmware/zmk-config-julien -DSNIPPET=studio-rpc-usb-uart-next -DCONFIG_ZMK_STUDIO=y"
+west build -b vadox_v1 --   -DZMK_CONFIG="/home/marcus/keyboards-firmware/zmk-config-julien/config"   -DZMK_EXTRA_MODULES="/home/marcus/keyboards-firmware/zmk-config-julien -DSNIPPET=studio-rpc-usb-uart-next -DCONFIG_ZMK_STUDIO=y"
 ```
 
 3. Output files are located in `~/zmk/app/build/zephyr/`:
@@ -129,8 +130,8 @@ Number row is reserved for lighting mode selection (to be mapped).
 
 ## Configuration Files
 
-- `config/boards/arm/keyboard_h723zg/` - Board definition
-  - `keyboard_h723zg.dts` - Main devicetree (GPIO pins, matrix, LEDs, sensors, etc.)
-  - `keyboard_h723zg_defconfig` - Kconfig options (BLE, RGB, etc.)
-  - `keyboard_h723zg-pinctrl.dtsi` - Pin control configuration
-  - `keyboard_h723zg.keymap` - Key mappings
+- `boards/arm/vadox_v1/` - Board definition
+  - `vadox_v1.dts` - Main devicetree (GPIO pins, matrix, LEDs, sensors, etc.)
+  - `vadox_v1_defconfig` - Kconfig options (BLE, RGB, etc.)
+  - `vadox_v1-layouts.dtsi` - Physical layout definitions
+  - `vadox_v1.keymap` - Key mappings

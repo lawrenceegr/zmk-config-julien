@@ -1,6 +1,6 @@
 # ZMK patches — USB OTG HS + Studio RPC over USB-next
 
-These patches add what the `keyboard_h723zg` board (STM32H723, USB OTG HS) needs and
+These patches add what the Vadox V1 board (`vadox_v1`, STM32H723, USB OTG HS) needs and
 that upstream ZMK `main` does not provide: the USB device-next stack wiring for OTG HS,
 the `studio-rpc-usb-uart-next` snippet, and related USB/HID changes. Without them the
 board fails to build (`CONFIG_ZMK_USB_STACK_NEXT` undefined, no OTG HS support).

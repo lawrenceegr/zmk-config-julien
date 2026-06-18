@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Lawrence Langat <lawrencelangatmi@gmail.com>
 # SPDX-License-Identifier: Apache-2.0
 
-config BOARD_KEYBOARD_H723ZG
-    bool "Julien Keyboard"
+config BOARD_VADOX_V1
+    bool "Vadox V1"
 	select SOC_STM32H723XX

@@ -8,7 +8,7 @@
 #
 ---
 include:
-  - board: keyboard_h723zg
+  - board: vadox_v1
     # snippet: studio-rpc-usb-uart
     # cmake-args: -DCONFIG_ZMK_STUDIO=y
-    # artifact-name: keyboard_h723zg_with_studio
+    # artifact-name: vadox_v1_with_studio
