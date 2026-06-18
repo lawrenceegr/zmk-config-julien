@@ -11,9 +11,9 @@ Apply on top of upstream `zmkfirmware/zmk` `main` at:
 
     b66a8cc8c1dc2992bdc17ee2e839e08b599190b1
 
-This is the exact commit the patches were generated against. The result is equivalent
-to the local `studio-rpc-usb-next` branch tip `1ba09822`, verified by reapplying the
-series to `main` and diffing (empty).
+This is the exact commit the patches were generated against. Patches `0001`–`0005`
+reproduce the branch tip `1ba09822`; `0006` extends it to `3ac91dce` (current tip),
+verified by reapplying the series to `main` and diffing (empty).
 
 ## Apply
 
@@ -32,3 +32,7 @@ intentionally omitted.
 - `0003-another-attempt.patch`
 - `0004-another-studio-attempt.patch`
 - `0005-configs-changed.patch`
+- `0006-usb-include-logging-log.h-before-LOG_MODULE_DECLARE.patch` — lets the **legacy**
+  USB stack compile (it was relying on `log.h` arriving via the next-stack header). Needed
+  for the RP2040 keypad, which falls back to the legacy stack because the USB-next
+  `udc_rpi_pico` controller does not enumerate at runtime on this revision.

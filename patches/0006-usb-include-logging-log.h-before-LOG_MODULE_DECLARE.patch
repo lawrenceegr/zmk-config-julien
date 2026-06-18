@@ -1,0 +1,42 @@
+From 3ac91dce8bd3aecf2d57c9b5c043f008e9450702 Mon Sep 17 00:00:00 2001
+From: lawrenceegr <lawrencelangatmi@gmail.com>
+Date: Thu, 18 Jun 2026 11:11:19 +0300
+Subject: [PATCH] usb: include logging/log.h before LOG_MODULE_DECLARE
+
+The OTG/USB-next rework left usb.c and usb_hid.c relying on log.h arriving
+transitively, which only happens on the next stack (via usbd.h). On the
+legacy stack log.h was never included, so LOG_MODULE_DECLARE was undefined
+and the files failed to compile. Include it explicitly (idempotent) so both
+USB stacks build.
+---
+ app/src/usb.c     | 1 +
+ app/src/usb_hid.c | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/app/src/usb.c b/app/src/usb.c
+index eb0bd812..1c017f45 100644
+--- a/app/src/usb.c
++++ b/app/src/usb.c
+@@ -6,6 +6,7 @@
+ 
+ #include <zephyr/device.h>
+ #include <zephyr/init.h>
++#include <zephyr/logging/log.h>
+ 
+ #include <zmk/usb.h>
+ #include <zmk/hid.h>
+diff --git a/app/src/usb_hid.c b/app/src/usb_hid.c
+index f18e451a..51b5d54b 100644
+--- a/app/src/usb_hid.c
++++ b/app/src/usb_hid.c
+@@ -6,6 +6,7 @@
+ 
+ #include <zephyr/device.h>
+ #include <zephyr/init.h>
++#include <zephyr/logging/log.h>
+ 
+ #include <zmk/usb.h>
+ #include <zmk/hid.h>
+-- 
+2.43.0
+
