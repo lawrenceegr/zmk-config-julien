@@ -12,8 +12,8 @@ Apply on top of upstream `zmkfirmware/zmk` `main` at:
     b66a8cc8c1dc2992bdc17ee2e839e08b599190b1
 
 This is the exact commit the patches were generated against. Patches `0001`–`0005`
-reproduce the branch tip `1ba09822`; `0006` extends it to `3ac91dce` (current tip),
-verified by reapplying the series to `main` and diffing (empty).
+reproduce the branch tip `1ba09822`; `0006` extends it to `3ac91dce`; `0007` extends it
+to `9e16ba17` (current tip).
 
 ## Apply
 
@@ -36,3 +36,7 @@ intentionally omitted.
   USB stack compile (it was relying on `log.h` arriving via the next-stack header). Needed
   for the RP2040 keypad, which falls back to the legacy stack because the USB-next
   `udc_rpi_pico` controller does not enumerate at runtime on this revision.
+- `0007-keymap-runtime-sensor-encoder-binding-get-set-persis.patch` — adds a runtime
+  sensor-binding get/set API to `keymap.c` (mirroring the matrix runtime keymap setters)
+  so the configurator can edit encoder sensor-bindings live, with settings persistence
+  (`keymap/s/<layer>/<sensor>`). No-op on boards without sensors (e.g. Vadox V1).
