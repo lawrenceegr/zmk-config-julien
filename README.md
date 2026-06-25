@@ -23,14 +23,19 @@ cd ~/zmk
 source .venv/bin/activate
 ```
 
-2. Build the firmware:
+2. Build the firmware (into `build_vadox_v1`):
 
 ```bash
 cd ~/zmk/app
-west build -b vadox_v1 --   -DZMK_CONFIG="/home/marcus/keyboards-firmware/zmk-config-julien/config"   -DZMK_EXTRA_MODULES="/home/marcus/keyboards-firmware/zmk-config-julien -DSNIPPET=studio-rpc-usb-uart-next -DCONFIG_ZMK_STUDIO=y"
+west build -b vadox_v1 -d build_vadox_v1 -- \
+  -DZMK_CONFIG="/home/marcus/vadox-workspace/keyboards/zmk-config-julien/config" \
+  -DZMK_EXTRA_MODULES="/home/marcus/vadox-workspace/keyboards/zmk-config-julien;/home/marcus/vadox-workspace/modules/zmk-configurator"
 ```
 
-3. Output files are located in `~/zmk/app/build/zephyr/`:
+The board config enables the Studio runtime-keymap stack on its own; the configurator module
+(`modules/zmk-configurator`) is what Vadox Studio talks to over its dedicated CDC endpoint.
+
+3. Output files are located in `~/zmk/app/build_vadox_v1/zephyr/`:
    - `zmk.hex` - Intel HEX format
    - `zmk.uf2` - UF2 format (for bootloader flashing)
 
@@ -40,8 +45,11 @@ west build -b vadox_v1 --   -DZMK_CONFIG="/home/marcus/keyboards-firmware/zmk-co
 
 ```bash
 openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
-  -c "program build/zephyr/zmk.hex verify reset exit"
+  -c "program build_vadox_v1/zephyr/zmk.hex verify reset exit"
 ```
+
+OpenOCD/ST-Link only reaches the STM32 internal flash (the `code` partition at `0x08000000`).
+It cannot touch the external settings flash — see Troubleshooting below.
 
 ### Using J-Link
 
@@ -49,21 +57,60 @@ openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
 west flash --runner jlink
 ```
 
-### Using nrfjprog
-
-```bash
-west flash --runner nrfjprog
-```
-
 ## Clean Build
 
 To perform a clean build, remove the build directory first:
 
 ```bash
-rm -rf ~/zmk/app/build
+rm -rf ~/zmk/app/build_vadox_v1
 ```
 
 Then run the build command again.
+
+## Troubleshooting
+
+### Wiping persistent settings (recover from a save-induced crash)
+
+**Symptom seen:** after writing settings from Vadox Studio, the board crashes. Erasing the
+settings partition recovers it.
+
+**Why it can't be done with OpenOCD:** persistent settings use the **NVS** backend
+(`CONFIG_SETTINGS_NVS`) stored on the **external W25Q128 SPI NOR** (on `spi5`), partition
+`storage` at offset `0x0`, size `0x10000` (64 KB) — see `boards/arm/vadox_v1/vadox_v1.dts`.
+OpenOCD/ST-Link can only program the STM32 internal flash, and this is a plain SPI bus (not
+memory-mapped QSPI/OCTOSPI), so there is no external loader for it. The wipe must be done by the
+firmware itself.
+
+ZMK provides `CONFIG_ZMK_SETTINGS_RESET_ON_START`, which erases the settings partition once on
+boot. The reset must run **after** the SPI-NOR device is initialized: `CONFIG_SPI_NOR_INIT_PRIORITY`
+is `80`, but the reset's default priority is `60` (would run before the flash is ready and silently
+no-op), so force it above 80.
+
+1. Build a one-shot wipe firmware into a **separate** directory (leaves `build_vadox_v1` intact):
+
+```bash
+cd ~/zmk && source .venv/bin/activate && cd app
+west build -b vadox_v1 -d build_vadox_reset -- \
+  -DZMK_CONFIG="/home/marcus/vadox-workspace/keyboards/zmk-config-julien/config" \
+  -DZMK_EXTRA_MODULES="/home/marcus/vadox-workspace/keyboards/zmk-config-julien;/home/marcus/vadox-workspace/modules/zmk-configurator" \
+  -DCONFIG_ZMK_SETTINGS_RESET_ON_START=y \
+  -DCONFIG_ZMK_SETTINGS_RESET_ON_START_INIT_PRIORITY=90
+```
+
+2. Flash it and let it boot for ~5 seconds — it erases the `storage` partition on boot (UART
+   prints `Erasing settings flash partition`):
+
+```bash
+openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
+  -c "program build_vadox_reset/zephyr/zmk.hex verify reset exit"
+```
+
+3. Reflash the normal firmware to return to a clean settings state:
+
+```bash
+openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
+  -c "program build_vadox_v1/zephyr/zmk.hex verify reset exit"
+```
 
 ## RGB Hardware
 
