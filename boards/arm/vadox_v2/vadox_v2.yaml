@@ -1,0 +1,20 @@
+identifier: vadox_v2
+name: vadox_v2
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+ram: 320
+flash: 1024
+supported:
+  - gpio
+  - i2c
+  - counter
+  - uart
+  - spi
+  - usb_device
+  - usbd
+  - rtc
+  - kscan
+  - nvs

@@ -1,9 +1,10 @@
 # ZMK patches — USB OTG HS + Studio RPC over USB-next
 
-These patches add what the Vadox V1 board (`vadox_v1`, STM32H723, USB OTG HS) needs and
-that upstream ZMK `main` does not provide: the USB device-next stack wiring for OTG HS,
+These patches add what the Vadox boards (`vadox_v1` and `vadox_v2`, both STM32H723, USB OTG HS)
+need and that upstream ZMK `main` does not provide: the USB device-next stack wiring for OTG HS,
 the `studio-rpc-usb-uart-next` snippet, and related USB/HID changes. Without them the
-board fails to build (`CONFIG_ZMK_USB_STACK_NEXT` undefined, no OTG HS support).
+boards fail to build (`CONFIG_ZMK_USB_STACK_NEXT` undefined, no OTG HS support). Both boards share
+the same SoC and USB stack, so the same patch series applies to each.
 
 ## Base
 
@@ -39,4 +40,5 @@ intentionally omitted.
 - `0007-keymap-runtime-sensor-encoder-binding-get-set-persis.patch` — adds a runtime
   sensor-binding get/set API to `keymap.c` (mirroring the matrix runtime keymap setters)
   so the configurator can edit encoder sensor-bindings live, with settings persistence
-  (`keymap/s/<layer>/<sensor>`). No-op on boards without sensors (e.g. Vadox V1).
+  (`keymap/s/<layer>/<sensor>`). Exercised by **Vadox V2**'s rotary encoder; a no-op on
+  **Vadox V1**, which has no sensors.

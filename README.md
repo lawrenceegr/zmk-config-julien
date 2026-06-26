@@ -1,7 +1,17 @@
-# Vadox V1 — ZMK Config
+# Vadox — ZMK Config
 
-ZMK firmware configuration for the Vadox V1, a custom STM32H723ZG-based unibody keyboard
-(board id `vadox_v1`).
+ZMK firmware configuration for the Vadox custom STM32H723ZG-based unibody keyboards. Two boards
+share this config and the same SoC, USB OTG HS stack, external settings flash, and per-key RGB:
+
+| Board id | Name | Switches | Encoder | Notes |
+|----------|------|----------|---------|-------|
+| `vadox_v1` | Vadox V1 | ~88 (6 rows) | — | TKL, per-key RGB |
+| `vadox_v2` | Vadox V2 | ~95 (7 rows) | 1 (EC11) | V1 + a 7th switch row and a rotary encoder (volume) |
+
+Everything below applies to both boards; substitute the board id (`vadox_v1` / `vadox_v2`) and the
+matching build directory where shown. The only configuration difference is that `vadox_v2` enables
+the EC11 encoder driver (`CONFIG_EC11`) and adds an `alps,ec11` sensor on PD5/PD6 with a
+`zmk,keymap-sensors` node; all shared Kconfig/devicetree is identical.
 
 ## Prerequisites
 
@@ -23,11 +33,18 @@ cd ~/zmk
 source .venv/bin/activate
 ```
 
-2. Build the firmware (into `build_vadox_v1`):
+2. Build the firmware (each board into its own directory):
 
 ```bash
 cd ~/zmk/app
+
+# Vadox V1
 west build -b vadox_v1 -d build_vadox_v1 -- \
+  -DZMK_CONFIG="/home/marcus/vadox-workspace/keyboards/zmk-config-julien/config" \
+  -DZMK_EXTRA_MODULES="/home/marcus/vadox-workspace/keyboards/zmk-config-julien;/home/marcus/vadox-workspace/modules/zmk-configurator"
+
+# Vadox V2 (V1 + encoder + 7 switches)
+west build -b vadox_v2 -d build_vadox_v2 -- \
   -DZMK_CONFIG="/home/marcus/vadox-workspace/keyboards/zmk-config-julien/config" \
   -DZMK_EXTRA_MODULES="/home/marcus/vadox-workspace/keyboards/zmk-config-julien;/home/marcus/vadox-workspace/modules/zmk-configurator"
 ```
@@ -35,7 +52,7 @@ west build -b vadox_v1 -d build_vadox_v1 -- \
 The board config enables the Studio runtime-keymap stack on its own; the configurator module
 (`modules/zmk-configurator`) is what Vadox Studio talks to over its dedicated CDC endpoint.
 
-3. Output files are located in `~/zmk/app/build_vadox_v1/zephyr/`:
+3. Output files are located in `~/zmk/app/build_vadox_v1/zephyr/` (or `build_vadox_v2/`):
    - `zmk.hex` - Intel HEX format
    - `zmk.uf2` - UF2 format (for bootloader flashing)
 
@@ -177,8 +194,15 @@ Number row is reserved for lighting mode selection (to be mapped).
 
 ## Configuration Files
 
-- `boards/arm/vadox_v1/` - Board definition
-  - `vadox_v1.dts` - Main devicetree (GPIO pins, matrix, LEDs, sensors, etc.)
-  - `vadox_v1_defconfig` - Kconfig options (BLE, RGB, etc.)
-  - `vadox_v1-layouts.dtsi` - Physical layout definitions
-  - `vadox_v1.keymap` - Key mappings
+Each board has its own directory under `boards/arm/` with the same file layout:
+
+- `boards/arm/vadox_v1/`, `boards/arm/vadox_v2/` - Board definitions
+  - `vadox_vX.dts` - Main devicetree (GPIO pins, matrix, LEDs, sensors, etc.)
+  - `vadox_vX_defconfig` - Kconfig options (RGB, configurator, etc.)
+  - `vadox_vX-layouts.dtsi` - Physical layout definitions
+  - `vadox_vX.keymap` - Key mappings
+
+The V2 devicetree adds a 7th matrix row (the 7 extra switches), an `alps,ec11` `right_encoder`
+on PD5/PD6, and a `zmk,keymap-sensors` node; its keymap adds the matching `sensor-bindings`
+(`&inc_dec_kp C_VOL_UP C_VOL_DN`) and a `&none`/`&trans` row for the new switches. All other
+devicetree, defconfig, and `.conf` content is identical to V1.
